@@ -1,5 +1,9 @@
 # Hyper Tree Router
 
+[![Version](https://img.shields.io/crates/v/hyper-tree-router.svg?style=flat)](https://crates.io/crates/hyper-tree-router)
+[![Documentation](https://img.shields.io/badge/docs-release-brightgreen.svg?style=flat)](https://docs.rs/hyper-tree-router)
+[![License](https://img.shields.io/crates/l/hyper-tree-router.svg?style=flat)](https://github.com/butlerx/hyper-tree-router/blob/master/LICENSE)
+
 Routing middleware for Hyper http library using Prefix tree (trie) for path
 finding. Gives the ability to define routes and handlers for given request path
 

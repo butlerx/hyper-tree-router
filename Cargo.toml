@@ -3,7 +3,6 @@ name = "hyper-tree-router"
 version = "0.1.0"
 edition = "2021"
 description = "Routing middleware for Hyper http library using Prefix tree (trie) for path finding."
-categories = ["data-structures", "no-std"]
 keywords = ["trie", "prefix", "tree", "hyper", "router"]
 authors = ["butlerx <butlerx@notthe.cloud>"]
 rust-version = "1.64"
