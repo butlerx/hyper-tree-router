@@ -14,9 +14,11 @@ repository = "https://github.com/butlerx/hyper-tree-router"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures = "^0.1"
-hyper = "^0.14"
+hyper = { version = "^0.14", features = ["http1", "server", "tcp"] }
 prefix_tree_map = "0.2.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
 
 [lib]
 name = "hyper_tree_router"

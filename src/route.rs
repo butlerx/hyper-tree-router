@@ -4,7 +4,8 @@ use std::{collections::HashMap, fmt};
 
 pub type Handler = fn(parameters::UrlParams, Request<Body>) -> Response<Body>;
 
-/// Holds route information
+// Holds route information
+#[derive(Clone)]
 pub struct Route {
     /// Path to match
     pub path: String,
