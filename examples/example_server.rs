@@ -34,10 +34,15 @@ fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     plain_text_response(body)
 }
 
+fn hello_handler(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    plain_text_response("Hello World".to_string())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let addr = "0.0.0.0:8080".parse().unwrap();
     let router = RouterBuilder::new()
+        .route(Route::url("/").get(hello_handler))
         .route(Route::url("/user/:user_id/home").get(user_handler))
         .route(Route::url("/product/:product_id/info").get(product_handler))
         .build();

@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let addr = "0.0.0.0:8080".parse().unwrap();
     let router = RouterBuilder::new()
         .route(Route::url("/user/:user_id/home").get(user_handler))
-        .route(Route::url("/").get(hello_hanlder))
+        .route(Route::url("/").get(hello_handler))
         .build();
     let server = Server::bind(&addr).serve(router);
     println!("Listening on http://{}", addr);
