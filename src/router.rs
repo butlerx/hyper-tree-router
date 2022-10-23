@@ -9,13 +9,14 @@ use std::{
 
 type HttpResult<T> = Result<T, StatusCode>;
 
-/// Router service to be passed to hyper
-/// passed to Server.bind().serve
+/// Router service to be passed to hyper `Server.bind().serve()`.
+/// This should be build with RouterBuilder.
 pub struct Router {
     pub routes: PrefixTreeMap<String, String, route::Route>,
 }
 
 impl Router {
+    /// Create a new Router with a given prefix tree.
     pub fn new(routes: PrefixTreeMap<String, String, route::Route>) -> Self {
         Self { routes }
     }
