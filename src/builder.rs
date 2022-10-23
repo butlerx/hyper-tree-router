@@ -12,7 +12,7 @@ impl RouterBuilder {
         }
     }
 
-    pub fn add(mut self, route: Route) -> Self {
+    pub fn route(mut self, route: Route) -> Self {
         self.routes
             .insert(RouterBuilder::build_path(route.path.clone()), route);
         self

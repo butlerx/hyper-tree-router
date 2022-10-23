@@ -60,8 +60,8 @@ mod integration_tests {
 
     fn test_router() -> RouterSvc {
         let router = RouterBuilder::new()
-            .add(Route::url("/").get(handle_get_root).post(handle_post_root))
-            .add(
+            .route(Route::url("/").get(handle_get_root).post(handle_post_root))
+            .route(
                 Route::url("/hello")
                     .get(handle_get_hello)
                     .post(handle_post_hello)
@@ -72,10 +72,10 @@ mod integration_tests {
                     .trace(handle_trace_hello)
                     .head(handle_head_hello),
             )
-            .add(Route::url("/foo").get(handle_get_foo).post(handle_post_foo))
-            .add(Route::url("/bar").get(handle_get_bar))
-            .add(Route::url("/foo/:id").get(handle_param_foo))
-            .add(Route::url("/bar/:id").get(handle_param_bar))
+            .route(Route::url("/foo").get(handle_get_foo).post(handle_post_foo))
+            .route(Route::url("/bar").get(handle_get_bar))
+            .route(Route::url("/foo/:id").get(handle_param_foo))
+            .route(Route::url("/bar/:id").get(handle_param_bar))
             .build();
 
         let routes = router.routes;
@@ -91,7 +91,7 @@ mod integration_tests {
             .unwrap();
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_get_hello);
+        assert!(handler as fn(_, _) -> _ == handle_get_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -104,7 +104,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_post_hello);
+        assert!(handler as fn(_, _) -> _ == handle_post_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -117,7 +117,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_delete_hello);
+        assert!(handler as fn(_, _) -> _ == handle_delete_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -130,7 +130,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_options_hello);
+        assert!(handler as fn(_, _) -> _ == handle_options_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -143,7 +143,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_put_hello);
+        assert!(handler as fn(_, _) -> _ == handle_put_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -156,7 +156,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_head_hello);
+        assert!(handler as fn(_, _) -> _ == handle_head_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -169,7 +169,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_trace_hello);
+        assert!(handler as fn(_, _) -> _ == handle_trace_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -182,7 +182,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler == handle_patch_hello);
+        assert!(handler as fn(_, _) -> _ == handle_patch_hello as fn(_, _) -> _);
     }
 
     #[test]
@@ -210,7 +210,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, params) = router.route(&request).unwrap();
-        assert!(handler == handle_param_foo);
+        assert!(handler as fn(_, _) -> _ == handle_param_foo as fn(_, _) -> _);
         assert!(params.captures.contains_key(":id"));
         assert!(params.captures.get(":id") == Some(&"bar".to_string()));
     }

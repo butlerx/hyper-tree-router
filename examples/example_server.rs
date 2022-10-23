@@ -40,8 +40,8 @@ fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let addr = "0.0.0.0:8080".parse().unwrap();
     let router = RouterBuilder::new()
-        .add(Route::url("/user/:user_id/home").get(user_handler))
-        .add(Route::url("/product/:product_id/info").get(product_handler))
+        .route(Route::url("/user/:user_id/home").get(user_handler))
+        .route(Route::url("/product/:product_id/info").get(product_handler))
         .build();
     let server = Server::bind(&addr).serve(router);
     println!("Listening on http://{}", addr);
