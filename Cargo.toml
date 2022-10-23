@@ -1,0 +1,22 @@
+[package]
+name = "hyper-tree-router"
+version = "0.1.0"
+edition = "2021"
+description = "Routing middleware for Hyper http library using Prefix tree (trie) for path finding."
+categories = ["data-structures", "no-std"]
+keywords = ["trie", "prefix", "tree", "hyper", "router", "routing", "middleware"]
+authors = ["butlerx <butlerx@notthe.cloud>"]
+rust-version = "1.64"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/butlerx/hyper-tree-router"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "^0.1"
+hyper = "^0.12"
+prefix_tree_map = "0.2.1"
+
+[lib]
+name = "hyper_tree_router"
