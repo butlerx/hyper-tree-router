@@ -1,13 +1,9 @@
-extern crate futures;
-extern crate hyper;
-
-use crate::futures::Future;
 use hyper::{
     header::{CONTENT_LENGTH, CONTENT_TYPE},
-    server::Server,
+    Server,
     Body, Request, Response,
 };
-use hyper_tree_router::{Route, Router, RouterBuilder, UrlParams};
+use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 
 fn plain_text_response(body: String) -> Response<Body> {
     Response::builder()
@@ -39,20 +35,16 @@ fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     plain_text_response(body)
 }
 
-fn router_service() -> Result<Router, std::io::Error> {
-    let router_builder = RouterBuilder::new()
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let addr = "0.0.0.0:8080".parse().unwrap();
+    let router = RouterBuilder::new()
         .add(Route::url("/user/:user_id/home").get(user_handler))
         .add(Route::url("/product/:product_id/info").get(product_handler))
         .build();
-
-    Ok(router_builder)
-}
-
-fn main() {
-    let addr = "0.0.0.0:8080".parse().unwrap();
-    let server = Server::bind(&addr)
-        .serve(router_service)
-        .map_err(|e| eprintln!("server error: {}", e));
-
-    hyper::rt::run(server)
+    let server = Server::bind(&addr).serve(router);
+    println!("Listening on http://{}", addr);
+    server.await?;
+    Ok(())
 }

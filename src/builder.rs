@@ -34,3 +34,8 @@ impl RouterBuilder {
         Router::new(self.routes.build())
     }
 }
+impl Default for RouterBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}

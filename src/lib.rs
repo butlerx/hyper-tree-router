@@ -1,6 +1,3 @@
-extern crate futures;
-extern crate hyper;
-
 mod builder;
 mod parameters;
 mod route;
@@ -10,6 +7,7 @@ pub use self::{builder::RouterBuilder, parameters::UrlParams, route::Route, rout
 
 #[cfg(test)]
 mod integration_tests {
+    use super::router::RouterSvc;
     use super::*;
     use hyper::{Body, Method, Request, Response, Uri};
     use std::str::FromStr;
@@ -60,8 +58,8 @@ mod integration_tests {
         unimplemented!()
     }
 
-    fn test_router() -> Router {
-        let router_builder = RouterBuilder::new()
+    fn test_router() -> RouterSvc {
+        let router = RouterBuilder::new()
             .add(Route::url("/").get(handle_get_root).post(handle_post_root))
             .add(
                 Route::url("/hello")
@@ -80,7 +78,8 @@ mod integration_tests {
             .add(Route::url("/bar/:id").get(handle_param_bar))
             .build();
 
-        router_builder
+        let routes = router.routes;
+        RouterSvc::new(routes)
     }
 
     #[test]

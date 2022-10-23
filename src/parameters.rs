@@ -13,6 +13,12 @@ impl UrlParams {
     }
 }
 
+impl Default for UrlParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Captures<&str, &str> for UrlParams {
     fn insert(&mut self, key: &str, value: &str) {
         self.captures.insert(key.to_string(), value.to_string());
