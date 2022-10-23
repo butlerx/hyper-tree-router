@@ -9,17 +9,16 @@ use std::{
 
 type HttpResult<T> = Result<T, StatusCode>;
 
+/// Router service to be passed to hyper
+/// passed to Server.bind().serve
 pub struct Router {
     pub routes: PrefixTreeMap<String, String, route::Route>,
 }
 
 impl Router {
     pub fn new(routes: PrefixTreeMap<String, String, route::Route>) -> Self {
-        Self {
-            routes,
-        }
+        Self { routes }
     }
-
 }
 
 pub struct RouterSvc {
@@ -73,8 +72,7 @@ impl RouterSvc {
 impl Service<Request<Body>> for RouterSvc {
     type Response = Response<Body>;
     type Error = hyper::Error;
-    type Future = 
-       Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>; 
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -84,9 +82,7 @@ impl Service<Request<Body>> for RouterSvc {
             Ok((handler, url_params)) => handler(url_params, request),
             Err(status_code) => (self.error_handler)(status_code),
         };
-        Box::pin(async {
-            Ok(resp)
-        })
+        Box::pin(async { Ok(resp) })
     }
 }
 
@@ -99,7 +95,7 @@ impl<T> Service<T> for Router {
         Ok(()).into()
     }
 
-     fn call(&mut self, _: T) -> Self::Future {
+    fn call(&mut self, _: T) -> Self::Future {
         let routes = self.routes.clone();
         let fut = async move { Ok(RouterSvc::new(routes)) };
         Box::pin(fut)

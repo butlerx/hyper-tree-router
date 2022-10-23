@@ -1,7 +1,6 @@
 use hyper::{
     header::{CONTENT_LENGTH, CONTENT_TYPE},
-    Server,
-    Body, Request, Response,
+    Body, Request, Response, Server,
 };
 use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 
@@ -34,7 +33,6 @@ fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     );
     plain_text_response(body)
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
