@@ -24,18 +24,14 @@ impl Router {
 
 pub struct RouterSvc {
     routes: PrefixTreeMap<String, String, route::Route>,
-    error_handler: fn(StatusCode) -> Response<Body>,
 }
 
 impl RouterSvc {
     pub fn new(routes: PrefixTreeMap<String, String, route::Route>) -> Self {
-        Self {
-            routes,
-            error_handler: Self::default_error_handler,
-        }
+        Self { routes }
     }
 
-    pub fn route(&self, request: &Request<Body>) -> HttpResult<(route::Handler, UrlParams)> {
+    pub fn route(&self, request: &Request<Body>) -> HttpResult<(&route::Handler, UrlParams)> {
         let path = request
             .uri()
             .path()
@@ -46,14 +42,14 @@ impl RouterSvc {
 
         match self.routes.find_and_capture(&path, &mut params) {
             Some(route) => match route.handlers.get(request.method()) {
-                Some(handler) => Ok((*handler, params)),
+                Some(handler) => Ok((handler, params)),
                 _ => Err(StatusCode::METHOD_NOT_ALLOWED),
             },
             None => Err(StatusCode::NOT_FOUND),
         }
     }
 
-    fn default_error_handler(status_code: StatusCode) -> Response<Body> {
+    fn default_error_handler(status_code: StatusCode) -> Result<Response<Body>, hyper::Error> {
         let (error_msg, error_code) = match status_code {
             StatusCode::NOT_FOUND => ("Page Not Found", StatusCode::NOT_FOUND),
             StatusCode::METHOD_NOT_ALLOWED => {
@@ -62,11 +58,11 @@ impl RouterSvc {
             StatusCode::NOT_IMPLEMENTED => ("not implemented", StatusCode::NOT_IMPLEMENTED),
             _ => ("Internal Server Error", StatusCode::INTERNAL_SERVER_ERROR),
         };
-        Response::builder()
+        Ok(Response::builder()
             .header(CONTENT_LENGTH, error_msg.len() as u64)
             .status(error_code)
             .body(Body::from(error_msg))
-            .expect("Failed to construct a response")
+            .expect("Failed to construct a response"))
     }
 }
 
@@ -78,12 +74,12 @@ impl Service<Request<Body>> for RouterSvc {
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
+
     fn call(&mut self, request: Request<Body>) -> Self::Future {
-        let resp = match self.route(&request) {
-            Ok((handler, url_params)) => handler(url_params, request),
-            Err(status_code) => (self.error_handler)(status_code),
-        };
-        Box::pin(async { Ok(resp) })
+        match self.route(&request) {
+            Ok((&handler, url_params)) => Box::pin(handler(url_params, request)),
+            Err(status_code) => Box::pin(async move { Self::default_error_handler(status_code) }),
+        }
     }
 }
 
@@ -98,7 +94,6 @@ impl<T> Service<T> for Router {
 
     fn call(&mut self, _: T) -> Self::Future {
         let routes = self.routes.clone();
-        let fut = async move { Ok(RouterSvc::new(routes)) };
-        Box::pin(fut)
+        Box::pin(async move { Ok(RouterSvc::new(routes)) })
     }
 }

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 /// URL Paramaters to be passed to handlers.
 /// Contains a HashMap containing parameters caputred from the url.
+#[derive(Debug, Clone)]
 pub struct UrlParams {
     /// HashMap Containing Programatic elements captured the URL.
     /// If the  Element was defined as `:user_id` the same key can be used to look it up

@@ -12,49 +12,94 @@ mod integration_tests {
     use hyper::{Body, Method, Request, Response, Uri};
     use std::str::FromStr;
 
-    fn handle_get_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_get_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_post_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_post_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_delete_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_delete_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_options_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_options_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_put_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_put_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_head_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_head_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_trace_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_trace_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_patch_hello(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_patch_hello(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_get_root(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_get_root(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_post_root(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_post_root(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_get_foo(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_get_foo(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_post_foo(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_post_foo(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_get_bar(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_get_bar(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_param_foo(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_param_foo(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
-    fn handle_param_bar(_: UrlParams, _: Request<Body>) -> Response<Body> {
+    async fn handle_param_bar(
+        _: UrlParams,
+        _: Request<Body>,
+    ) -> Result<Response<Body>, hyper::Error> {
         unimplemented!()
     }
 
@@ -90,7 +135,7 @@ mod integration_tests {
             .body(Body::empty())
             .unwrap();
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_get_hello as fn(_, _) -> _);
     }
 
@@ -103,7 +148,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_post_hello as fn(_, _) -> _);
     }
 
@@ -116,7 +161,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_delete_hello as fn(_, _) -> _);
     }
 
@@ -129,7 +174,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_options_hello as fn(_, _) -> _);
     }
 
@@ -142,7 +187,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_put_hello as fn(_, _) -> _);
     }
 
@@ -155,7 +200,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_head_hello as fn(_, _) -> _);
     }
 
@@ -168,7 +213,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_trace_hello as fn(_, _) -> _);
     }
 
@@ -181,7 +226,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, _) = router.route(&request).unwrap();
+        let (&handler, _) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_patch_hello as fn(_, _) -> _);
     }
 
@@ -209,7 +254,7 @@ mod integration_tests {
             .unwrap();
 
         let router = test_router();
-        let (handler, params) = router.route(&request).unwrap();
+        let (&handler, params) = router.route(&request).unwrap();
         assert!(handler as fn(_, _) -> _ == handle_param_foo as fn(_, _) -> _);
         assert!(params.captures.contains_key(":id"));
         assert!(params.captures.get(":id") == Some(&"bar".to_string()));

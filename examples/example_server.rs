@@ -4,15 +4,18 @@ use hyper::{
 };
 use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 
-fn plain_text_response(body: String) -> Response<Body> {
-    Response::builder()
+fn plain_text_response(body: String) -> Result<Response<Body>, hyper::Error> {
+    Ok(Response::builder()
         .header(CONTENT_LENGTH, body.len() as u64)
         .header(CONTENT_TYPE, "text/plain")
         .body(Body::from(body))
-        .expect("Failed to construct response")
+        .expect("Failed to construct response"))
 }
 
-fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
+async fn user_handler(
+    url_params: UrlParams,
+    _: Request<Body>,
+) -> Result<Response<Body>, hyper::Error> {
     let body = format!(
         "user: {}",
         url_params
@@ -23,7 +26,10 @@ fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     plain_text_response(body)
 }
 
-fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
+async fn product_handler(
+    url_params: UrlParams,
+    _: Request<Body>,
+) -> Result<Response<Body>, hyper::Error> {
     let body = format!(
         "product {}",
         url_params
@@ -34,7 +40,7 @@ fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     plain_text_response(body)
 }
 
-fn hello_handler(_: UrlParams, _: Request<Body>) -> Response<Body> {
+async fn hello_handler(_: UrlParams, _: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     plain_text_response("Hello World".to_string())
 }
 

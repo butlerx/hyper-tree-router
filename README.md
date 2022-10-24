@@ -39,7 +39,7 @@ fn plain_text_response(body: String) -> Response<Body> {
         .expect("Failed to construct response")
 }
 
-fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
+async fn user_handler(url_params: UrlParams, _: Request<Body>) -> Result<Response<Body> ,hyper::Error> {
     let body = format!(
         "user: {}",
         url_params
@@ -47,11 +47,11 @@ fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
             .get(":user_id")
             .unwrap_or(&"unknown user".to_string())
     );
-    plain_text_response(body)
+    Ok(plain_text_response(body))
 }
 
-fn hello_handler(_: UrlParams, _: Request<Body>) -> Response<Body> {
-    plain_text_response("Hello World".to_string())
+async fn hello_handler(_: UrlParams, _: Request<Body>) -> Result<Response<Body> ,hyper::Error>{
+    Ok(plain_text_response("Hello World".to_string()))
 }
 
 #[tokio::main]

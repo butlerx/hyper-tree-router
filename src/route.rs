@@ -1,8 +1,12 @@
 use super::parameters;
 use hyper::{Body, Method, Request, Response};
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, future::Future, pin::Pin};
 
-pub type Handler = fn(parameters::UrlParams, Request<Body>) -> Response<Body>;
+pub type Handler =
+    fn(
+        parameters::UrlParams,
+        Request<Body>,
+    ) -> Pin<Box<dyn Future<Output = Result<Response<Body>, hyper::Error>> + Send + Unpin>>;
 
 /// Define a Server Route for hyper server.
 /// Supports multiple method types per path.
