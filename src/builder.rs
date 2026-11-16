@@ -12,6 +12,7 @@ type TreeBuilder<V> = PrefixTreeMapBuilder<Cow<'static, str>, String, V>;
 pub struct RouterBuilder<ReqBody, ResBody> {
     routes: TreeBuilder<Route<ReqBody, ResBody>>,
     catch_all: TreeBuilder<CatchAll<ReqBody, ResBody>>,
+    catch_all_depths: Vec<usize>,
     error_handler: Option<ErrorHandler<ResBody>>,
 }
 
@@ -44,7 +45,10 @@ impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
         );
         let key = Self::build_path(&segments);
         match catch_all {
-            Some(name) => self.catch_all.insert(key, CatchAll { name, route }),
+            Some(name) => {
+                self.catch_all_depths.push(key.len());
+                self.catch_all.insert(key, CatchAll { name, route });
+            }
             None => self.routes.insert(key, route),
         }
         self
@@ -77,7 +81,11 @@ impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
     /// Build the router service for the routes
     #[must_use]
     pub fn build(self) -> Router<ReqBody, ResBody> {
-        let mut router = Router::new(self.routes.build(), self.catch_all.build());
+        let mut router = Router::new(
+            self.routes.build(),
+            self.catch_all.build(),
+            self.catch_all_depths,
+        );
         if let Some(handler) = self.error_handler {
             router = router.with_error_handler(handler);
         }
@@ -91,6 +99,7 @@ impl<ReqBody, ResBody> Default for RouterBuilder<ReqBody, ResBody> {
         Self {
             routes: PrefixTreeMapBuilder::default(),
             catch_all: PrefixTreeMapBuilder::default(),
+            catch_all_depths: Vec::new(),
             error_handler: None,
         }
     }

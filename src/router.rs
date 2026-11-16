@@ -72,6 +72,8 @@ pub(crate) enum RouteError {
 pub struct Router<ReqBody, ResBody> {
     routes: Arc<Tree<'static, Route<ReqBody, ResBody>>>,
     catch_all: Arc<Tree<'static, CatchAll<ReqBody, ResBody>>>,
+    /// Distinct segment counts of the catch-all prefixes, deepest first.
+    catch_all_depths: Arc<[usize]>,
     error_handler: Option<ErrorHandler<ResBody>>,
 }
 
@@ -79,10 +81,14 @@ impl<ReqBody, ResBody> Router<ReqBody, ResBody> {
     pub(crate) fn new(
         routes: Tree<'static, Route<ReqBody, ResBody>>,
         catch_all: Tree<'static, CatchAll<ReqBody, ResBody>>,
+        mut catch_all_depths: Vec<usize>,
     ) -> Self {
+        catch_all_depths.sort_unstable_by(|a, b| b.cmp(a));
+        catch_all_depths.dedup();
         Self {
             routes: Arc::new(routes),
             catch_all: Arc::new(catch_all),
+            catch_all_depths: catch_all_depths.into(),
             error_handler: None,
         }
     }
@@ -132,11 +138,17 @@ impl<ReqBody, ResBody> Router<ReqBody, ResBody> {
         }
 
         let catch_all: &Tree<'_, CatchAll<ReqBody, ResBody>> = &self.catch_all;
-        // `*rest` must match at least one segment, so the prefix stops short of the full path.
-        (1..path.len()).rev().find_map(|split| {
+        // Only try prefix lengths that a catch-all was registered with, deepest first, so
+        // the number of lookups depends on the route table, not on the request length.
+        self.catch_all_depths.iter().find_map(|&depth| {
+            let rest = path.get(depth..)?;
+            // `*rest` needs at least one non-empty segment: `/files/` doesn't match `/files/*p`.
+            if rest.iter().all(|segment| segment.is_empty()) {
+                return None;
+            }
             let mut params = UrlParams::default();
-            let entry = catch_all.find_and_capture(&path[..split], &mut params)?;
-            params.push(entry.name.clone(), path[split..].join("/"));
+            let entry = catch_all.find_and_capture(&path[..depth], &mut params)?;
+            params.push(entry.name.clone(), rest.join("/"));
             Some((&entry.route, params))
         })
     }
@@ -198,6 +210,7 @@ impl<ReqBody, ResBody> Clone for Router<ReqBody, ResBody> {
         Self {
             routes: Arc::clone(&self.routes),
             catch_all: Arc::clone(&self.catch_all),
+            catch_all_depths: Arc::clone(&self.catch_all_depths),
             error_handler: self.error_handler.clone(),
         }
     }

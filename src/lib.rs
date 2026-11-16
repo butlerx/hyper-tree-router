@@ -172,7 +172,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_custom_error_handler_allow_header_is_preserved() {
-        let router: Router<(), String> = RouterBuilder::new()
+        let router: Router<(), String> = RouterBuilder::default()
             .route(Route::url("/only-get").get(label("ok")))
             .error_handler(|status| {
                 let mut res = Response::new(String::new());
@@ -267,6 +267,41 @@ mod integration_tests {
         assert_eq!(
             send(files_router(), Method::GET, "/files").await.0,
             StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
+    async fn test_catch_all_rejects_trailing_slash_and_root() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/").await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            send(files_router(), Method::GET, "/files//").await.0,
+            StatusCode::NOT_FOUND
+        );
+
+        let root: Router<(), String> = RouterBuilder::default()
+            .route(Route::url("/*rest").get(|p: UrlParams, _: Req| async move {
+                Response::new(p.get("rest").unwrap_or_default().to_string())
+            }))
+            .build();
+        assert_eq!(
+            send(root.clone(), Method::GET, "/").await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            send(root, Method::GET, "/a/b").await,
+            (StatusCode::OK, "a/b".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deep_catch_all_falls_back_to_shallower_one() {
+        // `/files/deep/` has an empty remainder for `deep/*rest`, so `/files/*path` takes it.
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/deep/").await.1,
+            "catch-all deep/"
         );
     }
 
