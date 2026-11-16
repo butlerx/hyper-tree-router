@@ -2,25 +2,24 @@ use super::{route::Route, router::Router};
 use prefix_tree_map::{KeyPart, PrefixTreeMapBuilder};
 
 /// HTTP Router builder
-/// Responsibel for building a HTTP Router based on defined Route
-pub struct RouterBuilder {
-    routes: PrefixTreeMapBuilder<String, String, Route>,
+/// Responsible for building a HTTP Router based on defined Route
+pub struct RouterBuilder<ReqBody, ResBody> {
+    routes: PrefixTreeMapBuilder<String, String, Route<ReqBody, ResBody>>,
 }
 
-impl RouterBuilder {
+impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
     /// Create new `RouterBuilder`
     #[must_use]
     pub fn new() -> Self {
-        RouterBuilder {
-            routes: PrefixTreeMapBuilder::<String, String, Route>::new(),
+        Self {
+            routes: PrefixTreeMapBuilder::new(),
         }
     }
 
     /// Add a Route to the Router
     #[must_use]
-    pub fn route(mut self, route: Route) -> Self {
-        self.routes
-            .insert(RouterBuilder::build_path(&route.path), route);
+    pub fn route(mut self, route: Route<ReqBody, ResBody>) -> Self {
+        self.routes.insert(Self::build_path(&route.path), route);
         self
     }
 
@@ -36,14 +35,14 @@ impl RouterBuilder {
             .collect()
     }
 
-    /// Build the hyper service for the routes
+    /// Build the router service for the routes
     #[must_use]
-    pub fn build(self) -> Router {
+    pub fn build(self) -> Router<ReqBody, ResBody> {
         Router::new(self.routes.build())
     }
 }
 
-impl Default for RouterBuilder {
+impl<ReqBody, ResBody> Default for RouterBuilder<ReqBody, ResBody> {
     fn default() -> Self {
         Self::new()
     }
