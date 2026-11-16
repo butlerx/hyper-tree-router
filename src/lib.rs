@@ -171,6 +171,30 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn test_custom_error_handler_allow_header_is_preserved() {
+        let router: Router<(), String> = RouterBuilder::new()
+            .route(Route::url("/only-get").get(label("ok")))
+            .error_handler(|status| {
+                let mut res = Response::new(String::new());
+                *res.status_mut() = status;
+                res.headers_mut().insert(
+                    http::header::ALLOW,
+                    http::HeaderValue::from_static("CUSTOM"),
+                );
+                res
+            })
+            .build();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/only-get")
+            .body(())
+            .unwrap();
+        let res = router.oneshot(req).await.unwrap();
+        let allow: Vec<_> = res.headers().get_all(http::header::ALLOW).iter().collect();
+        assert_eq!(allow, ["CUSTOM"]);
+    }
+
+    #[tokio::test]
     async fn test_closure_handler_captures_state() {
         let hits = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&hits);
