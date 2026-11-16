@@ -1,6 +1,6 @@
 [package]
 name        = "hyper-tree-router"
-version     = "0.1.0"
+version     = "0.2.0"
 edition     = "2024"
 description = "Prefix tree (trie) router for hyper 1.x and tower, usable standalone or inside axum."
 keywords    = ["axum", "hyper", "router", "tower", "trie"]
