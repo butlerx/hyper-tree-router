@@ -126,7 +126,7 @@ impl<ReqBody, ResBody> Router<ReqBody, ResBody> {
         path: &[Cow<'r, str>],
     ) -> Option<(&'r Route<ReqBody, ResBody>, UrlParams)> {
         let routes: &Tree<'_, Route<ReqBody, ResBody>> = &self.routes;
-        let mut params = UrlParams::new();
+        let mut params = UrlParams::default();
         if let Some(route) = routes.find_and_capture(path, &mut params) {
             return Some((route, params));
         }
@@ -134,11 +134,9 @@ impl<ReqBody, ResBody> Router<ReqBody, ResBody> {
         let catch_all: &Tree<'_, CatchAll<ReqBody, ResBody>> = &self.catch_all;
         // `*rest` must match at least one segment, so the prefix stops short of the full path.
         (1..path.len()).rev().find_map(|split| {
-            let mut params = UrlParams::new();
+            let mut params = UrlParams::default();
             let entry = catch_all.find_and_capture(&path[..split], &mut params)?;
-            params
-                .captures
-                .insert(entry.name.clone(), path[split..].join("/"));
+            params.push(entry.name.clone(), path[split..].join("/"));
             Some((&entry.route, params))
         })
     }

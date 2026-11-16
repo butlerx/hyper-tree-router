@@ -20,23 +20,17 @@ fn plain_text_response(body: String) -> Response<Body> {
 }
 
 async fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body> {
-    let UrlParams { captures } = url_params;
     let body = format!(
         "user: {}",
-        captures
-            .get("user_id")
-            .map_or("unknown user", String::as_str)
+        url_params.get("user_id").unwrap_or("unknown user")
     );
     plain_text_response(body)
 }
 
 async fn product_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body> {
-    let UrlParams { captures } = url_params;
     let body = format!(
         "product {}",
-        captures
-            .get("product_id")
-            .map_or("unknown product", String::as_str)
+        url_params.get("product_id").unwrap_or("unknown product")
     );
     plain_text_response(body)
 }

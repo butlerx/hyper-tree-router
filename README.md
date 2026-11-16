@@ -148,7 +148,9 @@ let app = axum::Router::new()
 - `Router` is now the request service itself. `Router.routes` is no longer
   public.
 - Captured parameters are keyed by bare name: `params.get("user_id")`, not
-  `captures.get(":user_id")`.
+  `captures.get(":user_id")`. The `captures` `HashMap` is now private; use
+  `get`, `iter`, `len` and `is_empty`. `UrlParams::new()` is gone; use
+  `UrlParams::default()`.
 - Handlers are async (`async fn`, or a closure returning a future) instead of
   plain `fn` pointers, and closures can capture state. `Handler` is now a
   type-erased `Arc<dyn Fn ..>`.

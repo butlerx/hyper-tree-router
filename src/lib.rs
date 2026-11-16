@@ -302,6 +302,25 @@ mod integration_tests {
     }
 
     #[test]
+    fn test_params_keep_path_order_and_duplicates() {
+        let router: Router<(), String> = RouterBuilder::new()
+            .route(Route::url("/:org/:repo/x/:org").get(label("x")))
+            .build();
+        let req = Request::builder()
+            .uri("/acme/widget/x/other")
+            .body(())
+            .unwrap();
+        let (_, params) = router.route(&req).unwrap();
+        assert_eq!(
+            params.iter().collect::<Vec<_>>(),
+            [("org", "acme"), ("repo", "widget"), ("org", "other")]
+        );
+        assert_eq!(params.get("org"), Some("acme"));
+        assert_eq!(params.len(), 3);
+        assert!(UrlParams::default().is_empty());
+    }
+
+    #[test]
     fn test_router_is_send_sync_clone() {
         fn assert_bounds<T: Send + Sync + Clone + 'static>() {}
         assert_bounds::<Router<axum::body::Body, axum::body::Body>>();
