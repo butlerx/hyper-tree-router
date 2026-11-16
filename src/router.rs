@@ -17,8 +17,26 @@ use std::{
 };
 
 /// Future returned by the `Service` impls.
-pub type ServiceFuture<ResBody> =
-    Pin<Box<dyn Future<Output = Result<Response<ResBody>, Infallible>> + Send>>;
+///
+/// Wraps the handler's boxed future and maps its output to `Ok`, so each request
+/// costs exactly one allocation (the handler future itself).
+pub struct ServiceFuture<ResBody> {
+    inner: HandlerFuture<ResBody>,
+}
+
+impl<ResBody> Future for ServiceFuture<ResBody> {
+    type Output = Result<Response<ResBody>, Infallible>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.inner.as_mut().poll(cx).map(Ok)
+    }
+}
+
+impl<ResBody> fmt::Debug for ServiceFuture<ResBody> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ServiceFuture").finish_non_exhaustive()
+    }
+}
 
 type Routes<ReqBody, ResBody> = PrefixTreeMap<String, String, Route<ReqBody, ResBody>>;
 
@@ -121,8 +139,9 @@ where
     }
 
     fn call(&mut self, request: Request<ReqBody>) -> Self::Future {
-        let response = self.handle(request);
-        Box::pin(async move { Ok(response.await) })
+        ServiceFuture {
+            inner: self.handle(request),
+        }
     }
 }
 
@@ -135,7 +154,8 @@ where
     type Future = ServiceFuture<ResBody>;
 
     fn call(&self, request: Request<ReqBody>) -> Self::Future {
-        let response = self.handle(request);
-        Box::pin(async move { Ok(response.await) })
+        ServiceFuture {
+            inner: self.handle(request),
+        }
     }
 }
