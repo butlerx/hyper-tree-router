@@ -11,6 +11,9 @@ repository  = "https://github.com/butlerx/hyper-tree-router"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+serde = ["dep:serde"]
+
 [lib]
 name = "hyper_tree_router"
 
@@ -18,6 +21,7 @@ name = "hyper_tree_router"
 http            = "1"
 hyper           = "1"
 prefix_tree_map = "0.2.1"
+serde           = { version = "1", optional = true }
 tower-service   = "0.3"
 
 [dev-dependencies]
@@ -25,6 +29,7 @@ axum           = "0.8"
 http-body-util = "0.1"
 hyper          = { version = "1", features = ["http1", "server"] }
 hyper-util     = { version = "0.1", features = ["tokio"] }
+serde          = { version = "1", features = ["derive"] }
 tokio          = { version = "1", features = ["full"] }
 tower          = { version = "0.5", features = ["util"] }
 

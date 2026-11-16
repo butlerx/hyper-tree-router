@@ -63,10 +63,53 @@ let router = RouterBuilder::default()
     .build();
 ```
 
+### Typed params
+
+Enable the `serde` feature to take typed params as the handler's first argument
+instead of looking them up with `get`:
+
+```toml
+hyper-tree-router = { version = "0.2", features = ["serde"] }
+serde             = { version = "1", features = ["derive"] }
+```
+
+```rust
+use hyper_tree_router::Params;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct UserPath {
+    user_id: u64,
+}
+
+// Struct fields are read by param name
+async fn user(Params(p): Params<UserPath>, _: Request<Incoming>) -> Response<Full<Bytes>> {
+    Response::new(Full::from(format!("user {}", p.user_id)))
+}
+
+// Tuples are read in path order; a single value reads the only param
+async fn repo(Params((org, repo)): Params<(String, String)>, _: Request<Incoming>) -> Response<Full<Bytes>> {
+    Response::new(Full::from(format!("{org}/{repo}")))
+}
+
+let router = RouterBuilder::default()
+    .route(Route::url("/user/:user_id").get(user))
+    .route(Route::url("/repo/:org/:repo").get(repo))
+    .build();
+```
+
+Values parse from strings, so numbers, `bool`, `char`, `Option` and unit-variant
+enums work. If parsing fails (say `/user/abc` for a `u64`), the handler isn't
+called and the router answers `400 Bad Request` through the error handler.
+`UrlParams` still works as the first argument, and you can implement
+`FromUrlParams` for your own types.
+
 ### Sharing state with closures
 
-A handler can be any `Fn(UrlParams, Request<ReqBody>) -> impl Future` that is
-`Send + Sync + 'static`, so closures can capture shared state:
+A handler can be any `Fn(P, Request<ReqBody>) -> impl Future` that is
+`Send + Sync + 'static`, where `P` is `UrlParams` or another `FromUrlParams`
+type, so closures can capture shared state. Annotate the closure's first
+argument so the params type can be inferred:
 
 ```rust
 use std::sync::Arc;
@@ -151,6 +194,9 @@ let app = axum::Router::new()
   `captures.get(":user_id")`. The `captures` `HashMap` is now private; use
   `get`, `iter`, `len` and `is_empty`. `UrlParams::new()` and
   `RouterBuilder::new()` are gone; use `::default()`.
+- A handler's first argument can be any `FromUrlParams` type, such as
+  `Params<T>` with the `serde` feature. Closures need their first argument
+  annotated (`|p: UrlParams, req| ..`).
 - Handlers are async (`async fn`, or a closure returning a future) instead of
   plain `fn` pointers, and closures can capture state. `Handler` is now a
   type-erased `Arc<dyn Fn ..>`.

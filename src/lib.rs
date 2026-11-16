@@ -1,10 +1,14 @@
 mod builder;
+mod extract;
 mod parameters;
 mod route;
 mod router;
 
+#[cfg(feature = "serde")]
+pub use self::extract::Params;
 pub use self::{
     builder::RouterBuilder,
+    extract::{FromUrlParams, ParamsRejection},
     parameters::UrlParams,
     route::{Handler, HandlerFuture, Route},
     router::{ErrorHandler, Router, ServiceFuture},
@@ -199,7 +203,7 @@ mod integration_tests {
         let hits = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&hits);
         let router: Router<(), String> = RouterBuilder::default()
-            .route(Route::url("/count").get(move |_, _| {
+            .route(Route::url("/count").get(move |_: UrlParams, _| {
                 let counter = Arc::clone(&counter);
                 async move {
                     let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
@@ -359,5 +363,142 @@ mod integration_tests {
     fn test_router_is_send_sync_clone() {
         fn assert_bounds<T: Send + Sync + Clone + 'static>() {}
         assert_bounds::<Router<axum::body::Body, axum::body::Body>>();
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod typed_params_tests {
+    use super::*;
+    use http::{Request, Response, StatusCode};
+    use serde::Deserialize;
+    use tower::ServiceExt;
+
+    type Req = Request<()>;
+    type Res = Response<String>;
+
+    #[derive(Deserialize)]
+    struct UserPath {
+        user_id: u64,
+        tab: Option<String>,
+    }
+
+    #[derive(Deserialize, Debug, PartialEq)]
+    #[serde(rename_all = "lowercase")]
+    enum Kind {
+        Issues,
+        Pulls,
+    }
+
+    async fn user(Params(p): Params<UserPath>, _: Req) -> Res {
+        Response::new(format!("user {} tab {:?}", p.user_id, p.tab))
+    }
+
+    async fn repo(Params((org, repo)): Params<(String, String)>, _: Req) -> Res {
+        Response::new(format!("{org}/{repo}"))
+    }
+
+    async fn kind(Params((org, kind)): Params<(String, Kind)>, _: Req) -> Res {
+        Response::new(format!("{org} {kind:?}"))
+    }
+
+    async fn single(Params(id): Params<u32>, _: Req) -> Res {
+        Response::new(format!("id {id}"))
+    }
+
+    async fn raw(params: UrlParams, _: Req) -> Res {
+        Response::new(format!("raw {}", params.len()))
+    }
+
+    fn router() -> Router<(), String> {
+        RouterBuilder::default()
+            .route(Route::url("/user/:user_id/:tab").get(user))
+            .route(Route::url("/repo/:org/:repo").get(repo))
+            .route(Route::url("/kind/:org/:kind").get(kind))
+            .route(Route::url("/single/:id").get(single))
+            .route(Route::url("/raw/:a/:b").get(raw))
+            .route(
+                Route::url("/files/*path")
+                    .get(|Params(path): Params<String>, _: Req| async move { Response::new(path) }),
+            )
+            .build()
+    }
+
+    async fn get(uri: &str) -> (StatusCode, String) {
+        let res = router()
+            .oneshot(Request::builder().uri(uri).body(()).unwrap())
+            .await
+            .unwrap();
+        (res.status(), res.into_body())
+    }
+
+    #[tokio::test]
+    async fn struct_reads_params_by_name() {
+        assert_eq!(
+            get("/user/42/settings").await,
+            (
+                StatusCode::OK,
+                r#"user 42 tab Some("settings")"#.to_string()
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn tuple_reads_params_in_path_order() {
+        assert_eq!(get("/repo/acme/widget").await.1, "acme/widget");
+    }
+
+    #[tokio::test]
+    async fn unit_enum_variant() {
+        assert_eq!(get("/kind/acme/pulls").await.1, "acme Pulls");
+        assert_eq!(get("/kind/acme/nope").await.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn single_value_and_catch_all() {
+        assert_eq!(get("/single/7").await.1, "id 7");
+        assert_eq!(get("/files/a/b.txt").await.1, "a/b.txt");
+    }
+
+    #[tokio::test]
+    async fn untyped_params_still_work() {
+        assert_eq!(get("/raw/x/y").await.1, "raw 2");
+    }
+
+    #[tokio::test]
+    async fn parse_failure_is_bad_request_without_calling_handler() {
+        assert_eq!(
+            get("/user/abc/settings").await,
+            (
+                StatusCode::BAD_REQUEST,
+                "Invalid URL parameters".to_string()
+            )
+        );
+        assert_eq!(get("/single/-1").await.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn bad_request_goes_through_custom_error_handler() {
+        let router: Router<(), String> = RouterBuilder::default()
+            .route(Route::url("/single/:id").get(single))
+            .error_handler(|status| {
+                let mut res = Response::new(format!("custom {}", status.as_u16()));
+                *res.status_mut() = status;
+                res
+            })
+            .build();
+        let res = router
+            .oneshot(Request::builder().uri("/single/x").body(()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.into_body(), "custom 400");
+    }
+
+    #[test]
+    fn rejection_explains_the_failure() {
+        let mut params = UrlParams::default();
+        params.push("id".into(), "x".into());
+        let err = <Params<u32>>::from_url_params(params).unwrap_err();
+        assert!(err.to_string().contains("invalid URL parameters"), "{err}");
+        assert!(err.to_string().contains("\"x\""), "{err}");
     }
 }
