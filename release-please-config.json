@@ -42,7 +42,7 @@
         }
       ],
       "bump-patch-for-minor-pre-major": true,
-      "bootstrap-sha": "25f49a165ec28c9b81e0cde0a9e0566eca3b2583"
+      "bootstrap-sha": "f9923b44081a9b36fb13f4bc0e2adceb4a093323"
     }
   },
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
