@@ -19,7 +19,7 @@ fn plain_text_response(body: String) -> Response<Body> {
         .expect("Failed to construct response")
 }
 
-fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body> {
+async fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body> {
     let UrlParams { captures } = url_params;
     let body = format!(
         "user: {}",
@@ -30,7 +30,7 @@ fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body> {
     plain_text_response(body)
 }
 
-fn product_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body> {
+async fn product_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body> {
     let UrlParams { captures } = url_params;
     let body = format!(
         "product {}",
@@ -41,7 +41,7 @@ fn product_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Body
     plain_text_response(body)
 }
 
-fn hello_handler(_: UrlParams, _: Request<Incoming>) -> Response<Body> {
+async fn hello_handler(_: UrlParams, _: Request<Incoming>) -> Response<Body> {
     plain_text_response("Hello World".to_string())
 }
 

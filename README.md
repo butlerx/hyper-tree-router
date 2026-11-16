@@ -36,8 +36,9 @@ axum = "0.8"
 
 ### Defining routes
 
-URL parameters use the form `:param_name`. Captured values are in
-`url_params.captures`, keyed by the parameter name including the leading `:`.
+Handlers are async. URL parameters use the form `:param_name`. Captured values
+are in `url_params.captures`, keyed by the parameter name including the leading
+`:`.
 
 ```rust
 use http::{Request, Response};
@@ -45,13 +46,33 @@ use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
 use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 
-fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Full<Bytes>> {
+async fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Full<Bytes>> {
     let id = url_params.captures.get(":user_id").cloned().unwrap_or_default();
     Response::new(Full::from(format!("user: {id}")))
 }
 
 let router = RouterBuilder::new()
     .route(Route::url("/user/:user_id/home").get(user_handler))
+    .build();
+```
+
+### Sharing state with closures
+
+A handler can be any `Fn(UrlParams, Request<ReqBody>) -> impl Future` that is
+`Send + Sync + 'static`, so closures can capture shared state:
+
+```rust
+use std::sync::Arc;
+
+let db = Arc::new(Db::connect().await?);
+let router = RouterBuilder::new()
+    .route(Route::url("/user/:user_id").get(move |params: UrlParams, _req| {
+        let db = Arc::clone(&db);
+        async move {
+            let id = params.captures.get(":user_id").cloned().unwrap_or_default();
+            Response::new(Full::from(db.user_name(&id).await))
+        }
+    }))
     .build();
 ```
 
@@ -76,7 +97,7 @@ use axum::body::Body;
 use http::{Request, Response};
 use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 
-fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
+async fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
     let id = params.captures.get(":user_id").cloned().unwrap_or_default();
     Response::new(Body::from(format!("user: {id}")))
 }
@@ -99,3 +120,6 @@ let app = axum::Router::new()
   `Response<ResBody>` rather than using `hyper::Body`.
 - `Router` is now the request service itself. `Router.routes` is no longer
   public.
+- Handlers are async (`async fn`, or a closure returning a future) instead of
+  plain `fn` pointers, and closures can capture state. `Handler` is now a
+  type-erased `Arc<dyn Fn ..>`.

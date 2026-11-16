@@ -1,16 +1,24 @@
 use super::parameters::UrlParams;
 use http::{Method, Request, Response};
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, future::Future, pin::Pin, sync::Arc};
 
-/// Request handler.
+/// Boxed future returned by a [`Handler`].
+pub type HandlerFuture<ResBody> = Pin<Box<dyn Future<Output = Response<ResBody>> + Send>>;
+
+/// Type-erased async request handler.
 ///
 /// `ReqBody` is the incoming request body type (for example `hyper::body::Incoming`
 /// when serving with hyper directly, or `axum::body::Body` inside axum).
 /// `ResBody` is the response body type the handler produces.
-pub type Handler<ReqBody, ResBody> = fn(UrlParams, Request<ReqBody>) -> Response<ResBody>;
+///
+/// You don't build this directly: pass an `async fn` or a closure returning a future to
+/// [`Route::get`] and friends.
+pub type Handler<ReqBody, ResBody> =
+    Arc<dyn Fn(UrlParams, Request<ReqBody>) -> HandlerFuture<ResBody> + Send + Sync>;
 
 /// Define a Server Route.
-/// Supports multiple method types per path.
+/// Supports multiple method types per path. Handlers are async: pass an `async fn` or a
+/// closure returning a future. Closures can capture shared state (e.g. an `Arc<AppState>`).
 /// Optional URL Params can be defined with Path elements in the form `/:param_name` and then
 /// later be looked up in the handler.
 pub struct Route<ReqBody, ResBody> {
@@ -24,55 +32,91 @@ pub struct Route<ReqBody, ResBody> {
 impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
     /// Add handler for OPTIONS type requests.
     #[must_use]
-    pub fn options(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn options<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::OPTIONS, handler)
     }
 
     /// Add handler for GET type requests.
     #[must_use]
-    pub fn get(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn get<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::GET, handler)
     }
 
     /// Add handler for POST type requests.
     #[must_use]
-    pub fn post(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn post<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::POST, handler)
     }
 
     /// Add handler for PUT type requests.
     #[must_use]
-    pub fn put(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn put<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::PUT, handler)
     }
 
     /// Add handler for DELETE type requests.
     #[must_use]
-    pub fn delete(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn delete<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::DELETE, handler)
     }
 
     /// Add handler for HEAD type requests.
     #[must_use]
-    pub fn head(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn head<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::HEAD, handler)
     }
 
     /// Add handler for TRACE type requests.
     #[must_use]
-    pub fn trace(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn trace<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::TRACE, handler)
     }
 
     /// Add handler for CONNECT type requests.
     #[must_use]
-    pub fn connect(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn connect<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::CONNECT, handler)
     }
 
     /// Add handler for PATCH type requests.
     #[must_use]
-    pub fn patch(self, handler: Handler<ReqBody, ResBody>) -> Self {
+    pub fn patch<F, Fut>(self, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
         self.using(Method::PATCH, handler)
     }
 
@@ -87,7 +131,13 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
         }
     }
 
-    fn using(mut self, method: Method, handler: Handler<ReqBody, ResBody>) -> Self {
+    fn using<F, Fut>(mut self, method: Method, handler: F) -> Self
+    where
+        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response<ResBody>> + Send + 'static,
+    {
+        let handler: Handler<ReqBody, ResBody> =
+            Arc::new(move |params, request| Box::pin(handler(params, request)));
         self.handlers.insert(method, handler);
         self
     }
