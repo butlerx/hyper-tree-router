@@ -12,30 +12,22 @@ fn plain_text_response(body: String) -> Response<Body> {
         .expect("Failed to construct response")
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "Handler signature is fixed by the Handler type alias"
-)]
 fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
+    let UrlParams { captures } = url_params;
     let body = format!(
         "user: {}",
-        url_params
-            .captures
+        captures
             .get(":user_id")
             .unwrap_or(&"unknown user".to_string())
     );
     plain_text_response(body)
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "Handler signature is fixed by the Handler type alias"
-)]
 fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
+    let UrlParams { captures } = url_params;
     let body = format!(
         "product {}",
-        url_params
-            .captures
+        captures
             .get(":product_id")
             .unwrap_or(&"unknown user".to_string())
     );
