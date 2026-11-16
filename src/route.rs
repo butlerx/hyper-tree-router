@@ -1,4 +1,7 @@
-use super::parameters::UrlParams;
+use super::{
+    extract::{FromUrlParams, ParamsRejection},
+    parameters::UrlParams,
+};
 use http::{Method, Request, Response};
 use std::{collections::HashMap, fmt, future::Future, pin::Pin, sync::Arc};
 
@@ -12,13 +15,19 @@ pub type HandlerFuture<ResBody> = Pin<Box<dyn Future<Output = Response<ResBody>>
 /// `ResBody` is the response body type the handler produces.
 ///
 /// You don't build this directly: pass an `async fn` or a closure returning a future to
-/// [`Route::get`] and friends.
-pub type Handler<ReqBody, ResBody> =
-    Arc<dyn Fn(UrlParams, Request<ReqBody>) -> HandlerFuture<ResBody> + Send + Sync>;
+/// [`Route::get`] and friends. It returns `Err` when the params can't be converted into
+/// the handler's first argument (see [`FromUrlParams`]).
+pub type Handler<ReqBody, ResBody> = Arc<
+    dyn Fn(UrlParams, Request<ReqBody>) -> Result<HandlerFuture<ResBody>, ParamsRejection>
+        + Send
+        + Sync,
+>;
 
 /// Define a Server Route.
 /// Supports multiple method types per path. Handlers are async: pass an `async fn` or a
 /// closure returning a future. Closures can capture shared state (e.g. an `Arc<AppState>`).
+/// The handler's first argument is any [`FromUrlParams`] type: [`UrlParams`] or, with the
+/// `serde` feature, `Params<T>`.
 /// Optional URL Params can be defined with Path elements in the form `/:param_name` and then
 /// later be looked up in the handler.
 pub struct Route<ReqBody, ResBody> {
@@ -32,9 +41,10 @@ pub struct Route<ReqBody, ResBody> {
 impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
     /// Add handler for OPTIONS type requests.
     #[must_use]
-    pub fn options<F, Fut>(self, handler: F) -> Self
+    pub fn options<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::OPTIONS, handler)
@@ -42,9 +52,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for GET type requests.
     #[must_use]
-    pub fn get<F, Fut>(self, handler: F) -> Self
+    pub fn get<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::GET, handler)
@@ -52,9 +63,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for POST type requests.
     #[must_use]
-    pub fn post<F, Fut>(self, handler: F) -> Self
+    pub fn post<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::POST, handler)
@@ -62,9 +74,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for PUT type requests.
     #[must_use]
-    pub fn put<F, Fut>(self, handler: F) -> Self
+    pub fn put<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::PUT, handler)
@@ -72,9 +85,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for DELETE type requests.
     #[must_use]
-    pub fn delete<F, Fut>(self, handler: F) -> Self
+    pub fn delete<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::DELETE, handler)
@@ -82,9 +96,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for HEAD type requests.
     #[must_use]
-    pub fn head<F, Fut>(self, handler: F) -> Self
+    pub fn head<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::HEAD, handler)
@@ -92,9 +107,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for TRACE type requests.
     #[must_use]
-    pub fn trace<F, Fut>(self, handler: F) -> Self
+    pub fn trace<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::TRACE, handler)
@@ -102,9 +118,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for CONNECT type requests.
     #[must_use]
-    pub fn connect<F, Fut>(self, handler: F) -> Self
+    pub fn connect<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::CONNECT, handler)
@@ -112,9 +129,10 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
 
     /// Add handler for PATCH type requests.
     #[must_use]
-    pub fn patch<F, Fut>(self, handler: F) -> Self
+    pub fn patch<F, Fut, P>(self, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
         self.using(Method::PATCH, handler)
@@ -131,13 +149,16 @@ impl<ReqBody, ResBody> Route<ReqBody, ResBody> {
         }
     }
 
-    fn using<F, Fut>(mut self, method: Method, handler: F) -> Self
+    fn using<F, Fut, P>(mut self, method: Method, handler: F) -> Self
     where
-        F: Fn(UrlParams, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        F: Fn(P, Request<ReqBody>) -> Fut + Send + Sync + 'static,
+        P: FromUrlParams,
         Fut: Future<Output = Response<ResBody>> + Send + 'static,
     {
-        let handler: Handler<ReqBody, ResBody> =
-            Arc::new(move |params, request| Box::pin(handler(params, request)));
+        let handler: Handler<ReqBody, ResBody> = Arc::new(move |params, request| {
+            let params = P::from_url_params(params)?;
+            Ok(Box::pin(handler(params, request)))
+        });
         self.handlers.insert(method, handler);
         self
     }

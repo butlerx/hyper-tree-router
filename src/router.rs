@@ -50,8 +50,8 @@ pub(crate) struct CatchAll<ReqBody, ResBody> {
     pub(crate) route: Route<ReqBody, ResBody>,
 }
 
-/// Builds the response for a routing failure (`404 Not Found` or
-/// `405 Method Not Allowed`). Set one with `RouterBuilder::error_handler`.
+/// Builds the response for a routing failure (`404 Not Found`, `405 Method Not Allowed`,
+/// or `400 Bad Request` when typed params fail to parse). Set one with `RouterBuilder::error_handler`.
 pub type ErrorHandler<ResBody> = Arc<dyn Fn(StatusCode) -> Response<ResBody> + Send + Sync>;
 
 /// Why a request didn't reach a handler.
@@ -60,6 +60,8 @@ pub(crate) enum RouteError {
     NotFound,
     /// The path matched, but not the method. Holds the methods the path does accept.
     MethodNotAllowed(Vec<Method>),
+    /// The handler's params type rejected the captured params.
+    InvalidParams,
 }
 
 /// Router service. Build it with `RouterBuilder`.
@@ -160,7 +162,10 @@ where
 {
     fn handle(&self, request: Request<ReqBody>) -> HandlerFuture<ResBody> {
         match self.route(&request) {
-            Ok((handler, url_params)) => handler(url_params, request),
+            Ok((handler, url_params)) => match handler(url_params, request) {
+                Ok(future) => future,
+                Err(_) => Box::pin(ready(self.error_response(&RouteError::InvalidParams))),
+            },
             Err(error) => Box::pin(ready(self.error_response(&error))),
         }
     }
@@ -169,6 +174,7 @@ where
         let status = match error {
             RouteError::NotFound => StatusCode::NOT_FOUND,
             RouteError::MethodNotAllowed(_) => StatusCode::METHOD_NOT_ALLOWED,
+            RouteError::InvalidParams => StatusCode::BAD_REQUEST,
         };
         let mut response = match &self.error_handler {
             Some(handler) => handler(status),
@@ -193,6 +199,7 @@ where
         let error_msg = match status {
             StatusCode::NOT_FOUND => "Page Not Found",
             StatusCode::METHOD_NOT_ALLOWED => "method not supported",
+            StatusCode::BAD_REQUEST => "Invalid URL parameters",
             _ => "Internal Server Error",
         };
         let mut response = Response::new(ResBody::from(error_msg));

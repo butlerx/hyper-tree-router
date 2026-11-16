@@ -54,7 +54,8 @@ impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
         self
     }
 
-    /// Replace the built-in `404 Not Found` / `405 Method Not Allowed` responses.
+    /// Replace the built-in `404 Not Found` / `405 Method Not Allowed` /
+    /// `400 Bad Request` (typed params failed to parse) responses.
     ///
     /// The handler gets the status code and returns the full response. For a 405 the
     /// router adds an `Allow` header listing the path's methods, unless the handler

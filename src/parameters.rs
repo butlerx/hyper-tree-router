@@ -42,6 +42,11 @@ impl UrlParams {
         self.captures.is_empty()
     }
 
+    #[cfg_attr(not(feature = "serde"), allow(dead_code))]
+    pub(crate) fn into_pairs(self) -> Vec<(String, String)> {
+        self.captures
+    }
+
     pub(crate) fn push(&mut self, name: String, value: String) {
         self.captures.push((name, value));
     }
