@@ -149,11 +149,11 @@ let router = RouterBuilder::default()
 ### Serving with hyper
 
 Pass the router to `serve_connection` once per accepted connection. See
-[`examples/example_server.rs`](examples/example_server.rs) for a complete
+[`examples/basic.rs`](examples/basic.rs) for a complete
 server:
 
 ```sh
-cargo run --example example_server
+cargo run --example basic
 curl localhost:8080/user/42/home
 ```
 
@@ -180,6 +180,20 @@ let app = axum::Router::new()
     .route("/health", axum::routing::get(|| async { "ok" }))
     .nest_service("/legacy", tree); // GET /legacy/user/7 -> "user: 7"
 ```
+
+## Examples
+
+Each example serves on `127.0.0.1:8080` and lists `curl` commands to try at
+the top of the file.
+
+| Example | Shows | Run |
+|---|---|---|
+| [`basic`](examples/basic.rs) | Static paths, `:param` captures, several methods on one route | `cargo run --example basic` |
+| [`state`](examples/state.rs) | Closure handlers sharing an `Arc<AppState>` | `cargo run --example state` |
+| [`routing`](examples/routing.rs) | `*path` catch-alls, route priority, HEAD → GET fallback, 405 + `Allow` | `cargo run --example routing` |
+| [`error_handler`](examples/error_handler.rs) | Custom JSON 404/405 responses | `cargo run --example error_handler` |
+| [`typed_params`](examples/typed_params.rs) | `Params<T>` structs, tuples and enums; 400 on bad input | `cargo run --example typed_params --features serde` |
+| [`axum`](examples/axum.rs) | Mounting in axum with `nest_service`, wrapped in a tower layer | `cargo run --example axum` |
 
 ## Migrating from 0.1
 

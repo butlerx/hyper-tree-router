@@ -17,6 +17,10 @@ serde = ["dep:serde"]
 [lib]
 name = "hyper_tree_router"
 
+[[example]]
+name              = "typed_params"
+required-features = ["serde"]
+
 [dependencies]
 http            = "1"
 hyper           = "1"
