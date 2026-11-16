@@ -16,10 +16,22 @@ behind an `Arc`. The only requirement on the response body is
 
 ## Usage
 
-Add it to your `Cargo.toml`:
+Add it to your `Cargo.toml`, along with the crates the examples below import
+directly (this crate doesn't re-export them):
 
 ```toml
-hyper-tree-router = "^0.2"
+[dependencies]
+hyper-tree-router = "0.2"
+http              = "1"
+
+# Serving with hyper directly
+http-body-util = "0.1"
+hyper          = { version = "1", features = ["http1", "server"] }
+hyper-util     = { version = "0.1", features = ["tokio"] }
+tokio          = { version = "1", features = ["full"] }
+
+# Or mounting inside axum
+axum = "0.8"
 ```
 
 ### Defining routes
