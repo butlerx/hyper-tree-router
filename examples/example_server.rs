@@ -13,10 +13,10 @@ fn plain_text_response(body: String) -> Response<Body> {
 }
 
 fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
+    let UrlParams { captures } = url_params;
     let body = format!(
         "user: {}",
-        url_params
-            .captures
+        captures
             .get(":user_id")
             .unwrap_or(&"unknown user".to_string())
     );
@@ -24,10 +24,10 @@ fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
 }
 
 fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
+    let UrlParams { captures } = url_params;
     let body = format!(
         "product {}",
-        url_params
-            .captures
+        captures
             .get(":product_id")
             .unwrap_or(&"unknown user".to_string())
     );
@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .route(Route::url("/product/:product_id/info").get(product_handler))
         .build();
     let server = Server::bind(&addr).serve(router);
-    println!("Listening on http://{}", addr);
+    println!("Listening on http://{addr}");
     server.await?;
     Ok(())
 }

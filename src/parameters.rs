@@ -2,14 +2,15 @@ use prefix_tree_map::Captures;
 use std::collections::HashMap;
 
 /// URL Paramaters to be passed to handlers.
-/// Contains a HashMap containing parameters caputred from the url.
+/// Contains a `HashMap` containing parameters caputred from the url.
 pub struct UrlParams {
-    /// HashMap Containing Programatic elements captured the URL.
+    /// `HashMap` Containing Programatic elements captured the URL.
     /// If the  Element was defined as `:user_id` the same key can be used to look it up
     pub captures: HashMap<String, String>,
 }
 
 impl UrlParams {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             captures: HashMap::new(),
