@@ -78,8 +78,7 @@ mod integration_tests {
             .route(Route::url("/bar/:id").get(handle_param_bar))
             .build();
 
-        let routes = router.routes;
-        RouterSvc::new(routes)
+        RouterSvc::new(router.routes)
     }
 
     #[test]
@@ -91,7 +90,7 @@ mod integration_tests {
             .unwrap();
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_get_hello as fn(_, _) -> _);
+        assert_eq!(handler as usize, handle_get_hello as fn(_, _) -> _ as usize);
     }
 
     #[test]
@@ -104,7 +103,10 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_post_hello as fn(_, _) -> _);
+        assert_eq!(
+            handler as usize,
+            handle_post_hello as fn(_, _) -> _ as usize
+        );
     }
 
     #[test]
@@ -117,7 +119,10 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_delete_hello as fn(_, _) -> _);
+        assert_eq!(
+            handler as usize,
+            handle_delete_hello as fn(_, _) -> _ as usize
+        );
     }
 
     #[test]
@@ -130,7 +135,10 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_options_hello as fn(_, _) -> _);
+        assert_eq!(
+            handler as usize,
+            handle_options_hello as fn(_, _) -> _ as usize
+        );
     }
 
     #[test]
@@ -143,7 +151,7 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_put_hello as fn(_, _) -> _);
+        assert_eq!(handler as usize, handle_put_hello as fn(_, _) -> _ as usize);
     }
 
     #[test]
@@ -156,7 +164,10 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_head_hello as fn(_, _) -> _);
+        assert_eq!(
+            handler as usize,
+            handle_head_hello as fn(_, _) -> _ as usize
+        );
     }
 
     #[test]
@@ -169,7 +180,10 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_trace_hello as fn(_, _) -> _);
+        assert_eq!(
+            handler as usize,
+            handle_trace_hello as fn(_, _) -> _ as usize
+        );
     }
 
     #[test]
@@ -182,7 +196,10 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, _) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_patch_hello as fn(_, _) -> _);
+        assert_eq!(
+            handler as usize,
+            handle_patch_hello as fn(_, _) -> _ as usize
+        );
     }
 
     #[test]
@@ -210,8 +227,8 @@ mod integration_tests {
 
         let router = test_router();
         let (handler, params) = router.route(&request).unwrap();
-        assert!(handler as fn(_, _) -> _ == handle_param_foo as fn(_, _) -> _);
+        assert_eq!(handler as usize, handle_param_foo as fn(_, _) -> _ as usize);
         assert!(params.captures.contains_key(":id"));
-        assert!(params.captures.get(":id") == Some(&"bar".to_string()));
+        assert_eq!(params.captures.get(":id"), Some(&"bar".to_string()));
     }
 }

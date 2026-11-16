@@ -8,7 +8,8 @@ pub struct RouterBuilder {
 }
 
 impl RouterBuilder {
-    /// Create new RouterBuilder
+    /// Create new `RouterBuilder`
+    #[must_use]
     pub fn new() -> Self {
         RouterBuilder {
             routes: PrefixTreeMapBuilder::<String, String, Route>::new(),
@@ -16,13 +17,14 @@ impl RouterBuilder {
     }
 
     /// Add a Route to the Router
+    #[must_use]
     pub fn route(mut self, route: Route) -> Self {
         self.routes
-            .insert(RouterBuilder::build_path(route.path.clone()), route);
+            .insert(RouterBuilder::build_path(&route.path), route);
         self
     }
 
-    fn build_path(path: String) -> Vec<KeyPart<String, String>> {
+    fn build_path(path: &str) -> Vec<KeyPart<String, String>> {
         path.split('/')
             .map(|part| {
                 if part.starts_with(':') {
@@ -35,6 +37,7 @@ impl RouterBuilder {
     }
 
     /// Build the hyper service for the routes
+    #[must_use]
     pub fn build(self) -> Router {
         Router::new(self.routes.build())
     }

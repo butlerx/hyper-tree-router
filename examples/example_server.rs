@@ -12,6 +12,10 @@ fn plain_text_response(body: String) -> Response<Body> {
         .expect("Failed to construct response")
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Handler signature is fixed by the Handler type alias"
+)]
 fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     let body = format!(
         "user: {}",
@@ -23,6 +27,10 @@ fn user_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     plain_text_response(body)
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Handler signature is fixed by the Handler type alias"
+)]
 fn product_handler(url_params: UrlParams, _: Request<Body>) -> Response<Body> {
     let body = format!(
         "product {}",
@@ -47,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .route(Route::url("/product/:product_id/info").get(product_handler))
         .build();
     let server = Server::bind(&addr).serve(router);
-    println!("Listening on http://{}", addr);
+    println!("Listening on http://{addr}");
     server.await?;
     Ok(())
 }
