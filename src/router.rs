@@ -1,6 +1,6 @@
 use super::{
     parameters::UrlParams,
-    route::{Handler, Route},
+    route::{Handler, HandlerFuture, Route},
 };
 use http::{
     HeaderValue, Request, Response, StatusCode,
@@ -10,10 +10,15 @@ use prefix_tree_map::PrefixTreeMap;
 use std::{
     convert::Infallible,
     fmt,
-    future::{Ready, ready},
+    future::{Future, ready},
+    pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
+
+/// Future returned by the `Service` impls.
+pub type ServiceFuture<ResBody> =
+    Pin<Box<dyn Future<Output = Result<Response<ResBody>, Infallible>> + Send>>;
 
 type Routes<ReqBody, ResBody> = PrefixTreeMap<String, String, Route<ReqBody, ResBody>>;
 
@@ -51,7 +56,7 @@ impl<ReqBody, ResBody> Router<ReqBody, ResBody> {
 
         match self.routes.find_and_capture(&path, &mut params) {
             Some(route) => match route.handlers.get(request.method()) {
-                Some(handler) => Ok((*handler, params)),
+                Some(handler) => Ok((Arc::clone(handler), params)),
                 None => Err(StatusCode::METHOD_NOT_ALLOWED),
             },
             None => Err(StatusCode::NOT_FOUND),
@@ -61,12 +66,12 @@ impl<ReqBody, ResBody> Router<ReqBody, ResBody> {
 
 impl<ReqBody, ResBody> Router<ReqBody, ResBody>
 where
-    ResBody: From<&'static str>,
+    ResBody: From<&'static str> + Send + 'static,
 {
-    fn handle(&self, request: Request<ReqBody>) -> Response<ResBody> {
+    fn handle(&self, request: Request<ReqBody>) -> HandlerFuture<ResBody> {
         match self.route(&request) {
             Ok((handler, url_params)) => handler(url_params, request),
-            Err(status_code) => Self::error_response(status_code),
+            Err(status_code) => Box::pin(ready(Self::error_response(status_code))),
         }
     }
 
@@ -105,30 +110,32 @@ impl<ReqBody, ResBody> fmt::Debug for Router<ReqBody, ResBody> {
 
 impl<ReqBody, ResBody> tower_service::Service<Request<ReqBody>> for Router<ReqBody, ResBody>
 where
-    ResBody: From<&'static str>,
+    ResBody: From<&'static str> + Send + 'static,
 {
     type Response = Response<ResBody>;
     type Error = Infallible;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Future = ServiceFuture<ResBody>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: Request<ReqBody>) -> Self::Future {
-        ready(Ok(self.handle(request)))
+        let response = self.handle(request);
+        Box::pin(async move { Ok(response.await) })
     }
 }
 
 impl<ReqBody, ResBody> hyper::service::Service<Request<ReqBody>> for Router<ReqBody, ResBody>
 where
-    ResBody: From<&'static str>,
+    ResBody: From<&'static str> + Send + 'static,
 {
     type Response = Response<ResBody>;
     type Error = Infallible;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Future = ServiceFuture<ResBody>;
 
     fn call(&self, request: Request<ReqBody>) -> Self::Future {
-        ready(Ok(self.handle(request)))
+        let response = self.handle(request);
+        Box::pin(async move { Ok(response.await) })
     }
 }

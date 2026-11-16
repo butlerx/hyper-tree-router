@@ -6,8 +6,7 @@ use http_body_util::BodyExt;
 use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 use tower::ServiceExt;
 
-#[expect(clippy::needless_pass_by_value, reason = "handler signature is fixed")]
-fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
+async fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
     let id = params.captures.get(":user_id").cloned().unwrap_or_default();
     Response::new(Body::from(format!("user: {id}")))
 }
