@@ -76,6 +76,26 @@ let router = RouterBuilder::new()
     .build();
 ```
 
+### Custom error responses
+
+Unmatched paths get a `404` and unmatched methods get a `405`. Replace the
+built-in plain-text bodies with `error_handler`. On a `405` the router always
+adds an `Allow` header listing the path's methods, unless your handler already
+set one.
+
+```rust
+let router = RouterBuilder::new()
+    .route(Route::url("/user/:user_id").get(user_handler))
+    .error_handler(|status| {
+        Response::builder()
+            .status(status)
+            .header("content-type", "application/json")
+            .body(Full::from(format!(r#"{{"error":{}}}"#, status.as_u16())))
+            .unwrap()
+    })
+    .build();
+```
+
 ### Serving with hyper
 
 Pass the router to `serve_connection` once per accepted connection. See

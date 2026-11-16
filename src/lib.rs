@@ -7,7 +7,7 @@ pub use self::{
     builder::RouterBuilder,
     parameters::UrlParams,
     route::{Handler, HandlerFuture, Route},
-    router::{Router, ServiceFuture},
+    router::{ErrorHandler, Router, ServiceFuture},
 };
 
 #[cfg(test)]
@@ -124,6 +124,74 @@ mod integration_tests {
             send(test_router(), Method::DELETE, "/bar").await.0,
             StatusCode::METHOD_NOT_ALLOWED
         );
+    }
+
+    #[tokio::test]
+    async fn test_method_not_allowed_lists_allowed_methods() {
+        let req = Request::builder()
+            .method(Method::DELETE)
+            .uri("/foo")
+            .body(())
+            .unwrap();
+        let res = test_router().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(res.headers()[http::header::ALLOW], "GET, POST");
+    }
+
+    fn custom_errors() -> Router<(), String> {
+        RouterBuilder::new()
+            .route(Route::url("/only-get").get(label("ok")))
+            .error_handler(|status| {
+                let mut res = Response::new(format!("custom {}", status.as_u16()));
+                *res.status_mut() = status;
+                res
+            })
+            .build()
+    }
+
+    #[tokio::test]
+    async fn test_custom_error_handler_not_found() {
+        assert_eq!(
+            send(custom_errors(), Method::GET, "/missing").await,
+            (StatusCode::NOT_FOUND, "custom 404".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_custom_error_handler_keeps_allow_header() {
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/only-get")
+            .body(())
+            .unwrap();
+        let res = custom_errors().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(res.headers()[http::header::ALLOW], "GET");
+        assert_eq!(res.into_body(), "custom 405");
+    }
+
+    #[tokio::test]
+    async fn test_custom_error_handler_allow_header_is_preserved() {
+        let router: Router<(), String> = RouterBuilder::new()
+            .route(Route::url("/only-get").get(label("ok")))
+            .error_handler(|status| {
+                let mut res = Response::new(String::new());
+                *res.status_mut() = status;
+                res.headers_mut().insert(
+                    http::header::ALLOW,
+                    http::HeaderValue::from_static("CUSTOM"),
+                );
+                res
+            })
+            .build();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/only-get")
+            .body(())
+            .unwrap();
+        let res = router.oneshot(req).await.unwrap();
+        let allow: Vec<_> = res.headers().get_all(http::header::ALLOW).iter().collect();
+        assert_eq!(allow, ["CUSTOM"]);
     }
 
     #[tokio::test]
