@@ -7,12 +7,12 @@ use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 use tower::ServiceExt;
 
 async fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
-    let id = params.captures.get(":user_id").cloned().unwrap_or_default();
+    let id = params.get("user_id").unwrap_or_default();
     Response::new(Body::from(format!("user: {id}")))
 }
 
 fn app() -> axum::Router {
-    let tree = RouterBuilder::new()
+    let tree = RouterBuilder::default()
         .route(Route::url("/user/:user_id").get(user_handler))
         .build();
 

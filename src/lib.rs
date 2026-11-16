@@ -29,11 +29,11 @@ mod integration_tests {
     }
 
     async fn echo_id(params: UrlParams, _: Req) -> Res {
-        Response::new(params.captures.get(":id").cloned().unwrap_or_default())
+        Response::new(params.get("id").unwrap_or_default().to_string())
     }
 
     fn test_router() -> Router<(), String> {
-        RouterBuilder::new()
+        RouterBuilder::default()
             .route(
                 Route::url("/")
                     .get(label("get_root"))
@@ -135,11 +135,11 @@ mod integration_tests {
             .unwrap();
         let res = test_router().oneshot(req).await.unwrap();
         assert_eq!(res.status(), StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(res.headers()[http::header::ALLOW], "GET, POST");
+        assert_eq!(res.headers()[http::header::ALLOW], "GET, HEAD, POST");
     }
 
     fn custom_errors() -> Router<(), String> {
-        RouterBuilder::new()
+        RouterBuilder::default()
             .route(Route::url("/only-get").get(label("ok")))
             .error_handler(|status| {
                 let mut res = Response::new(format!("custom {}", status.as_u16()));
@@ -166,13 +166,13 @@ mod integration_tests {
             .unwrap();
         let res = custom_errors().oneshot(req).await.unwrap();
         assert_eq!(res.status(), StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(res.headers()[http::header::ALLOW], "GET");
+        assert_eq!(res.headers()[http::header::ALLOW], "GET, HEAD");
         assert_eq!(res.into_body(), "custom 405");
     }
 
     #[tokio::test]
     async fn test_custom_error_handler_allow_header_is_preserved() {
-        let router: Router<(), String> = RouterBuilder::new()
+        let router: Router<(), String> = RouterBuilder::default()
             .route(Route::url("/only-get").get(label("ok")))
             .error_handler(|status| {
                 let mut res = Response::new(String::new());
@@ -198,7 +198,7 @@ mod integration_tests {
     async fn test_closure_handler_captures_state() {
         let hits = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&hits);
-        let router: Router<(), String> = RouterBuilder::new()
+        let router: Router<(), String> = RouterBuilder::default()
             .route(Route::url("/count").get(move |_, _| {
                 let counter = Arc::clone(&counter);
                 async move {
@@ -211,6 +211,148 @@ mod integration_tests {
         assert_eq!(send(router.clone(), Method::GET, "/count").await.1, "1");
         assert_eq!(send(router, Method::GET, "/count").await.1, "2");
         assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    fn files_router() -> Router<(), String> {
+        RouterBuilder::default()
+            .route(
+                Route::url("/files/*path").get(|p: UrlParams, _: Req| async move {
+                    Response::new(format!("catch-all {}", p.get("path").unwrap_or_default()))
+                }),
+            )
+            .route(Route::url("/files/readme").get(label("exact readme")))
+            .route(
+                Route::url("/files/:name/raw").get(|p: UrlParams, _: Req| async move {
+                    Response::new(format!("raw {}", p.get("name").unwrap_or_default()))
+                }),
+            )
+            .route(
+                Route::url("/files/deep/*rest").get(|p: UrlParams, _: Req| async move {
+                    Response::new(format!("deep {}", p.get("rest").unwrap_or_default()))
+                }),
+            )
+            .build()
+    }
+
+    #[tokio::test]
+    async fn test_catch_all_captures_rest_of_path() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/a/b/c.txt").await,
+            (StatusCode::OK, "catch-all a/b/c.txt".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_exact_and_param_routes_beat_catch_all() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/readme").await.1,
+            "exact readme"
+        );
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/x/raw").await.1,
+            "raw x"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_longest_catch_all_prefix_wins() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/deep/a/b").await.1,
+            "deep a/b"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_catch_all_needs_at_least_one_segment() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files").await.0,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
+    async fn test_catch_all_rejects_trailing_slash_and_root() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/").await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            send(files_router(), Method::GET, "/files//").await.0,
+            StatusCode::NOT_FOUND
+        );
+
+        let root: Router<(), String> = RouterBuilder::default()
+            .route(Route::url("/*rest").get(|p: UrlParams, _: Req| async move {
+                Response::new(p.get("rest").unwrap_or_default().to_string())
+            }))
+            .build();
+        assert_eq!(
+            send(root.clone(), Method::GET, "/").await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            send(root, Method::GET, "/a/b").await,
+            (StatusCode::OK, "a/b".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deep_catch_all_falls_back_to_shallower_one() {
+        // `/files/deep/` has an empty remainder for `deep/*rest`, so `/files/*path` takes it.
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/deep/").await.1,
+            "catch-all deep/"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "catch-all `*` must be the last segment")]
+    fn test_catch_all_must_be_last() {
+        let _: RouterBuilder<(), String> =
+            RouterBuilder::default().route(Route::url("/a/*rest/b").get(label("x")));
+    }
+
+    #[tokio::test]
+    async fn test_head_falls_back_to_get() {
+        assert_eq!(
+            send(test_router(), Method::HEAD, "/foo").await,
+            (StatusCode::OK, "get_foo".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_explicit_head_handler_wins_over_get() {
+        assert_eq!(
+            send(test_router(), Method::HEAD, "/hello").await.1,
+            "head_hello"
+        );
+    }
+
+    #[test]
+    fn test_params_use_bare_names() {
+        let req = Request::builder().uri("/foo/42").body(()).unwrap();
+        let (_, params) = test_router().route(&req).unwrap();
+        assert_eq!(params.get("id"), Some("42"));
+        assert_eq!(params.get(":id"), None);
+    }
+
+    #[test]
+    fn test_params_keep_path_order_and_duplicates() {
+        let router: Router<(), String> = RouterBuilder::default()
+            .route(Route::url("/:org/:repo/x/:org").get(label("x")))
+            .build();
+        let req = Request::builder()
+            .uri("/acme/widget/x/other")
+            .body(())
+            .unwrap();
+        let (_, params) = router.route(&req).unwrap();
+        assert_eq!(
+            params.iter().collect::<Vec<_>>(),
+            [("org", "acme"), ("repo", "widget"), ("org", "other")]
+        );
+        assert_eq!(params.get("org"), Some("acme"));
+        assert_eq!(params.len(), 3);
+        assert!(UrlParams::default().is_empty());
     }
 
     #[test]
