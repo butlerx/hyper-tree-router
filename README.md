@@ -36,9 +36,16 @@ axum = "0.8"
 
 ### Defining routes
 
-Handlers are async. URL parameters use the form `:param_name`. Captured values
-are in `url_params.captures`, keyed by the parameter name including the leading
-`:`.
+Handlers are async. Path segments use these forms:
+
+| Pattern | Matches | Capture |
+|---|---|---|
+| `/user/:user_id` | exactly one segment | `params.get("user_id")` |
+| `/files/*path` | one or more trailing segments, as the last segment | `params.get("path")` → `"a/b/c.txt"` |
+
+Exact and `:param` routes take priority over `*` catch-alls, and the longest
+catch-all prefix wins. `HEAD` requests fall back to the `GET` handler when a
+route has no `HEAD` handler.
 
 ```rust
 use http::{Request, Response};
@@ -47,7 +54,7 @@ use hyper::body::{Bytes, Incoming};
 use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 
 async fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<Full<Bytes>> {
-    let id = url_params.captures.get(":user_id").cloned().unwrap_or_default();
+    let id = url_params.get("user_id").unwrap_or_default();
     Response::new(Full::from(format!("user: {id}")))
 }
 
@@ -69,7 +76,7 @@ let router = RouterBuilder::new()
     .route(Route::url("/user/:user_id").get(move |params: UrlParams, _req| {
         let db = Arc::clone(&db);
         async move {
-            let id = params.captures.get(":user_id").cloned().unwrap_or_default();
+            let id = params.get("user_id").unwrap_or_default();
             Response::new(Full::from(db.user_name(&id).await))
         }
     }))
@@ -118,7 +125,7 @@ use http::{Request, Response};
 use hyper_tree_router::{Route, RouterBuilder, UrlParams};
 
 async fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
-    let id = params.captures.get(":user_id").cloned().unwrap_or_default();
+    let id = params.get("user_id").unwrap_or_default();
     Response::new(Body::from(format!("user: {id}")))
 }
 
@@ -140,6 +147,8 @@ let app = axum::Router::new()
   `Response<ResBody>` rather than using `hyper::Body`.
 - `Router` is now the request service itself. `Router.routes` is no longer
   public.
+- Captured parameters are keyed by bare name: `params.get("user_id")`, not
+  `captures.get(":user_id")`.
 - Handlers are async (`async fn`, or a closure returning a future) instead of
   plain `fn` pointers, and closures can capture state. `Handler` is now a
   type-erased `Arc<dyn Fn ..>`.

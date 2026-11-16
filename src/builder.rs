@@ -1,15 +1,18 @@
 use super::{
     route::Route,
-    router::{ErrorHandler, Router},
+    router::{CatchAll, ErrorHandler, Router},
 };
 use http::{Response, StatusCode};
 use prefix_tree_map::{KeyPart, PrefixTreeMapBuilder};
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
+
+type TreeBuilder<V> = PrefixTreeMapBuilder<Cow<'static, str>, String, V>;
 
 /// HTTP Router builder
 /// Responsible for building a HTTP Router based on defined Route
 pub struct RouterBuilder<ReqBody, ResBody> {
-    routes: PrefixTreeMapBuilder<String, String, Route<ReqBody, ResBody>>,
+    routes: TreeBuilder<Route<ReqBody, ResBody>>,
+    catch_all: TreeBuilder<CatchAll<ReqBody, ResBody>>,
     error_handler: Option<ErrorHandler<ResBody>>,
 }
 
@@ -19,14 +22,42 @@ impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
     pub fn new() -> Self {
         Self {
             routes: PrefixTreeMapBuilder::new(),
+            catch_all: PrefixTreeMapBuilder::new(),
             error_handler: None,
         }
     }
 
-    /// Add a Route to the Router
+    /// Add a Route to the Router.
+    ///
+    /// Path segments starting with `:` capture one segment (`/user/:id`). A final
+    /// segment starting with `*` captures the rest of the path, one or more segments
+    /// joined with `/` (`/files/*path`). Exact and `:param` routes take priority over
+    /// catch-alls.
+    ///
+    /// # Panics
+    ///
+    /// If a `*` segment is not the last segment of the path.
     #[must_use]
     pub fn route(mut self, route: Route<ReqBody, ResBody>) -> Self {
-        self.routes.insert(Self::build_path(&route.path), route);
+        let mut segments: Vec<&str> = route.path.split('/').collect();
+        let catch_all = match segments.last() {
+            Some(last) if last.starts_with('*') => {
+                let name = last[1..].to_string();
+                segments.pop();
+                Some(name)
+            }
+            _ => None,
+        };
+        assert!(
+            !segments.iter().any(|s| s.starts_with('*')),
+            "catch-all `*` must be the last segment: {}",
+            route.path
+        );
+        let key = Self::build_path(&segments);
+        match catch_all {
+            Some(name) => self.catch_all.insert(key, CatchAll { name, route }),
+            None => self.routes.insert(key, route),
+        }
         self
     }
 
@@ -44,14 +75,12 @@ impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
         self
     }
 
-    fn build_path(path: &str) -> Vec<KeyPart<String, String>> {
-        path.split('/')
-            .map(|part| {
-                if part.starts_with(':') {
-                    KeyPart::Wildcard(part.to_string())
-                } else {
-                    KeyPart::Exact(part.to_string())
-                }
+    fn build_path(segments: &[&str]) -> Vec<KeyPart<Cow<'static, str>, String>> {
+        segments
+            .iter()
+            .map(|part| match part.strip_prefix(':') {
+                Some(name) => KeyPart::Wildcard(name.to_string()),
+                None => KeyPart::Exact(Cow::Owned((*part).to_string())),
             })
             .collect()
     }
@@ -59,7 +88,7 @@ impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
     /// Build the router service for the routes
     #[must_use]
     pub fn build(self) -> Router<ReqBody, ResBody> {
-        let mut router = Router::new(self.routes.build());
+        let mut router = Router::new(self.routes.build(), self.catch_all.build());
         if let Some(handler) = self.error_handler {
             router = router.with_error_handler(handler);
         }

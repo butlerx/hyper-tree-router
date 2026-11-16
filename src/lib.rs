@@ -29,7 +29,7 @@ mod integration_tests {
     }
 
     async fn echo_id(params: UrlParams, _: Req) -> Res {
-        Response::new(params.captures.get(":id").cloned().unwrap_or_default())
+        Response::new(params.get("id").unwrap_or_default().to_string())
     }
 
     fn test_router() -> Router<(), String> {
@@ -135,7 +135,7 @@ mod integration_tests {
             .unwrap();
         let res = test_router().oneshot(req).await.unwrap();
         assert_eq!(res.status(), StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(res.headers()[http::header::ALLOW], "GET, POST");
+        assert_eq!(res.headers()[http::header::ALLOW], "GET, HEAD, POST");
     }
 
     fn custom_errors() -> Router<(), String> {
@@ -166,7 +166,7 @@ mod integration_tests {
             .unwrap();
         let res = custom_errors().oneshot(req).await.unwrap();
         assert_eq!(res.status(), StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(res.headers()[http::header::ALLOW], "GET");
+        assert_eq!(res.headers()[http::header::ALLOW], "GET, HEAD");
         assert_eq!(res.into_body(), "custom 405");
     }
 
@@ -211,6 +211,94 @@ mod integration_tests {
         assert_eq!(send(router.clone(), Method::GET, "/count").await.1, "1");
         assert_eq!(send(router, Method::GET, "/count").await.1, "2");
         assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    fn files_router() -> Router<(), String> {
+        RouterBuilder::new()
+            .route(
+                Route::url("/files/*path").get(|p: UrlParams, _: Req| async move {
+                    Response::new(format!("catch-all {}", p.get("path").unwrap_or_default()))
+                }),
+            )
+            .route(Route::url("/files/readme").get(label("exact readme")))
+            .route(
+                Route::url("/files/:name/raw").get(|p: UrlParams, _: Req| async move {
+                    Response::new(format!("raw {}", p.get("name").unwrap_or_default()))
+                }),
+            )
+            .route(
+                Route::url("/files/deep/*rest").get(|p: UrlParams, _: Req| async move {
+                    Response::new(format!("deep {}", p.get("rest").unwrap_or_default()))
+                }),
+            )
+            .build()
+    }
+
+    #[tokio::test]
+    async fn test_catch_all_captures_rest_of_path() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/a/b/c.txt").await,
+            (StatusCode::OK, "catch-all a/b/c.txt".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_exact_and_param_routes_beat_catch_all() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/readme").await.1,
+            "exact readme"
+        );
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/x/raw").await.1,
+            "raw x"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_longest_catch_all_prefix_wins() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files/deep/a/b").await.1,
+            "deep a/b"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_catch_all_needs_at_least_one_segment() {
+        assert_eq!(
+            send(files_router(), Method::GET, "/files").await.0,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "catch-all `*` must be the last segment")]
+    fn test_catch_all_must_be_last() {
+        let _: RouterBuilder<(), String> =
+            RouterBuilder::new().route(Route::url("/a/*rest/b").get(label("x")));
+    }
+
+    #[tokio::test]
+    async fn test_head_falls_back_to_get() {
+        assert_eq!(
+            send(test_router(), Method::HEAD, "/foo").await,
+            (StatusCode::OK, "get_foo".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_explicit_head_handler_wins_over_get() {
+        assert_eq!(
+            send(test_router(), Method::HEAD, "/hello").await.1,
+            "head_hello"
+        );
+    }
+
+    #[test]
+    fn test_params_use_bare_names() {
+        let req = Request::builder().uri("/foo/42").body(()).unwrap();
+        let (_, params) = test_router().route(&req).unwrap();
+        assert_eq!(params.get("id"), Some("42"));
+        assert_eq!(params.get(":id"), None);
     }
 
     #[test]

@@ -24,7 +24,7 @@ async fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<B
     let body = format!(
         "user: {}",
         captures
-            .get(":user_id")
+            .get("user_id")
             .map_or("unknown user", String::as_str)
     );
     plain_text_response(body)
@@ -35,7 +35,7 @@ async fn product_handler(url_params: UrlParams, _: Request<Incoming>) -> Respons
     let body = format!(
         "product {}",
         captures
-            .get(":product_id")
+            .get("product_id")
             .map_or("unknown product", String::as_str)
     );
     plain_text_response(body)
