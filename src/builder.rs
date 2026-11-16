@@ -8,8 +8,7 @@ use std::{borrow::Cow, sync::Arc};
 
 type TreeBuilder<V> = PrefixTreeMapBuilder<Cow<'static, str>, String, V>;
 
-/// HTTP Router builder
-/// Responsible for building a HTTP Router based on defined Route
+/// HTTP Router builder. Start with `RouterBuilder::default()`, add routes, then `build()`.
 pub struct RouterBuilder<ReqBody, ResBody> {
     routes: TreeBuilder<Route<ReqBody, ResBody>>,
     catch_all: TreeBuilder<CatchAll<ReqBody, ResBody>>,
@@ -17,16 +16,6 @@ pub struct RouterBuilder<ReqBody, ResBody> {
 }
 
 impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
-    /// Create new `RouterBuilder`
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            routes: PrefixTreeMapBuilder::new(),
-            catch_all: PrefixTreeMapBuilder::new(),
-            error_handler: None,
-        }
-    }
-
     /// Add a Route to the Router.
     ///
     /// Path segments starting with `:` capture one segment (`/user/:id`). A final
@@ -96,8 +85,13 @@ impl<ReqBody, ResBody> RouterBuilder<ReqBody, ResBody> {
     }
 }
 
+// Manual impl: `#[derive(Default)]` would wrongly require `ReqBody: Default + ResBody: Default`.
 impl<ReqBody, ResBody> Default for RouterBuilder<ReqBody, ResBody> {
     fn default() -> Self {
-        Self::new()
+        Self {
+            routes: PrefixTreeMapBuilder::default(),
+            catch_all: PrefixTreeMapBuilder::default(),
+            error_handler: None,
+        }
     }
 }

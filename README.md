@@ -58,7 +58,7 @@ async fn user_handler(url_params: UrlParams, _: Request<Incoming>) -> Response<F
     Response::new(Full::from(format!("user: {id}")))
 }
 
-let router = RouterBuilder::new()
+let router = RouterBuilder::default()
     .route(Route::url("/user/:user_id/home").get(user_handler))
     .build();
 ```
@@ -72,7 +72,7 @@ A handler can be any `Fn(UrlParams, Request<ReqBody>) -> impl Future` that is
 use std::sync::Arc;
 
 let db = Arc::new(Db::connect().await?);
-let router = RouterBuilder::new()
+let router = RouterBuilder::default()
     .route(Route::url("/user/:user_id").get(move |params: UrlParams, _req| {
         let db = Arc::clone(&db);
         async move {
@@ -91,7 +91,7 @@ adds an `Allow` header listing the path's methods, unless your handler already
 set one.
 
 ```rust
-let router = RouterBuilder::new()
+let router = RouterBuilder::default()
     .route(Route::url("/user/:user_id").get(user_handler))
     .error_handler(|status| {
         Response::builder()
@@ -129,7 +129,7 @@ async fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
     Response::new(Body::from(format!("user: {id}")))
 }
 
-let tree = RouterBuilder::new()
+let tree = RouterBuilder::default()
     .route(Route::url("/user/:user_id").get(user_handler))
     .build();
 
@@ -149,8 +149,8 @@ let app = axum::Router::new()
   public.
 - Captured parameters are keyed by bare name: `params.get("user_id")`, not
   `captures.get(":user_id")`. The `captures` `HashMap` is now private; use
-  `get`, `iter`, `len` and `is_empty`. `UrlParams::new()` is gone; use
-  `UrlParams::default()`.
+  `get`, `iter`, `len` and `is_empty`. `UrlParams::new()` and
+  `RouterBuilder::new()` are gone; use `::default()`.
 - Handlers are async (`async fn`, or a closure returning a future) instead of
   plain `fn` pointers, and closures can capture state. `Handler` is now a
   type-erased `Arc<dyn Fn ..>`.

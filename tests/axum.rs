@@ -12,7 +12,7 @@ async fn user_handler(params: UrlParams, _: Request<Body>) -> Response<Body> {
 }
 
 fn app() -> axum::Router {
-    let tree = RouterBuilder::new()
+    let tree = RouterBuilder::default()
         .route(Route::url("/user/:user_id").get(user_handler))
         .build();
 

@@ -33,7 +33,7 @@ mod integration_tests {
     }
 
     fn test_router() -> Router<(), String> {
-        RouterBuilder::new()
+        RouterBuilder::default()
             .route(
                 Route::url("/")
                     .get(label("get_root"))
@@ -139,7 +139,7 @@ mod integration_tests {
     }
 
     fn custom_errors() -> Router<(), String> {
-        RouterBuilder::new()
+        RouterBuilder::default()
             .route(Route::url("/only-get").get(label("ok")))
             .error_handler(|status| {
                 let mut res = Response::new(format!("custom {}", status.as_u16()));
@@ -198,7 +198,7 @@ mod integration_tests {
     async fn test_closure_handler_captures_state() {
         let hits = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&hits);
-        let router: Router<(), String> = RouterBuilder::new()
+        let router: Router<(), String> = RouterBuilder::default()
             .route(Route::url("/count").get(move |_, _| {
                 let counter = Arc::clone(&counter);
                 async move {
@@ -214,7 +214,7 @@ mod integration_tests {
     }
 
     fn files_router() -> Router<(), String> {
-        RouterBuilder::new()
+        RouterBuilder::default()
             .route(
                 Route::url("/files/*path").get(|p: UrlParams, _: Req| async move {
                     Response::new(format!("catch-all {}", p.get("path").unwrap_or_default()))
@@ -274,7 +274,7 @@ mod integration_tests {
     #[should_panic(expected = "catch-all `*` must be the last segment")]
     fn test_catch_all_must_be_last() {
         let _: RouterBuilder<(), String> =
-            RouterBuilder::new().route(Route::url("/a/*rest/b").get(label("x")));
+            RouterBuilder::default().route(Route::url("/a/*rest/b").get(label("x")));
     }
 
     #[tokio::test]
@@ -303,7 +303,7 @@ mod integration_tests {
 
     #[test]
     fn test_params_keep_path_order_and_duplicates() {
-        let router: Router<(), String> = RouterBuilder::new()
+        let router: Router<(), String> = RouterBuilder::default()
             .route(Route::url("/:org/:repo/x/:org").get(label("x")))
             .build();
         let req = Request::builder()
