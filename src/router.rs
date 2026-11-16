@@ -1,42 +1,46 @@
-use super::{parameters::UrlParams, route};
-use hyper::{header::CONTENT_LENGTH, service::Service, Body, Request, Response, StatusCode};
+use super::{
+    parameters::UrlParams,
+    route::{Handler, Route},
+};
+use http::{
+    HeaderValue, Request, Response, StatusCode,
+    header::{CONTENT_LENGTH, CONTENT_TYPE},
+};
 use prefix_tree_map::PrefixTreeMap;
 use std::{
-    future::Future,
-    pin::Pin,
+    convert::Infallible,
+    fmt,
+    future::{Ready, ready},
+    sync::Arc,
     task::{Context, Poll},
 };
 
-type HttpResult<T> = Result<T, StatusCode>;
+type Routes<ReqBody, ResBody> = PrefixTreeMap<String, String, Route<ReqBody, ResBody>>;
 
-/// Router service to be passed to hyper `Server.bind().serve()`.
-/// This should be build with `RouterBuilder`.
-pub struct Router {
-    pub routes: PrefixTreeMap<String, String, route::Route>,
+/// Router service. Build it with `RouterBuilder`.
+///
+/// It implements both `tower::Service` and `hyper::service::Service`, so it can be
+/// served directly by hyper, wrapped in tower middleware, or mounted inside axum with
+/// `axum::Router::nest_service` / `fallback_service`.
+///
+/// Cloning is cheap: the route tree is shared behind an `Arc`.
+pub struct Router<ReqBody, ResBody> {
+    routes: Arc<Routes<ReqBody, ResBody>>,
 }
 
-impl Router {
+impl<ReqBody, ResBody> Router<ReqBody, ResBody> {
     /// Create a new Router with a given prefix tree.
     #[must_use]
-    pub fn new(routes: PrefixTreeMap<String, String, route::Route>) -> Self {
-        Self { routes }
-    }
-}
-
-pub struct RouterSvc {
-    routes: PrefixTreeMap<String, String, route::Route>,
-    error_handler: fn(StatusCode) -> Response<Body>,
-}
-
-impl RouterSvc {
-    pub fn new(routes: PrefixTreeMap<String, String, route::Route>) -> Self {
+    pub fn new(routes: Routes<ReqBody, ResBody>) -> Self {
         Self {
-            routes,
-            error_handler: Self::default_error_handler,
+            routes: Arc::new(routes),
         }
     }
 
-    pub fn route(&self, request: &Request<Body>) -> HttpResult<(route::Handler, UrlParams)> {
+    pub(crate) fn route(
+        &self,
+        request: &Request<ReqBody>,
+    ) -> Result<(Handler<ReqBody, ResBody>, UrlParams), StatusCode> {
         let path = request
             .uri()
             .path()
@@ -48,13 +52,25 @@ impl RouterSvc {
         match self.routes.find_and_capture(&path, &mut params) {
             Some(route) => match route.handlers.get(request.method()) {
                 Some(handler) => Ok((*handler, params)),
-                _ => Err(StatusCode::METHOD_NOT_ALLOWED),
+                None => Err(StatusCode::METHOD_NOT_ALLOWED),
             },
             None => Err(StatusCode::NOT_FOUND),
         }
     }
+}
 
-    fn default_error_handler(status_code: StatusCode) -> Response<Body> {
+impl<ReqBody, ResBody> Router<ReqBody, ResBody>
+where
+    ResBody: From<&'static str>,
+{
+    fn handle(&self, request: Request<ReqBody>) -> Response<ResBody> {
+        match self.route(&request) {
+            Ok((handler, url_params)) => handler(url_params, request),
+            Err(status_code) => Self::error_response(status_code),
+        }
+    }
+
+    fn error_response(status_code: StatusCode) -> Response<ResBody> {
         let (error_msg, error_code) = match status_code {
             StatusCode::NOT_FOUND => ("Page Not Found", StatusCode::NOT_FOUND),
             StatusCode::METHOD_NOT_ALLOWED => {
@@ -63,43 +79,56 @@ impl RouterSvc {
             StatusCode::NOT_IMPLEMENTED => ("not implemented", StatusCode::NOT_IMPLEMENTED),
             _ => ("Internal Server Error", StatusCode::INTERNAL_SERVER_ERROR),
         };
-        Response::builder()
-            .header(CONTENT_LENGTH, error_msg.len() as u64)
-            .status(error_code)
-            .body(Body::from(error_msg))
-            .expect("Failed to construct a response")
+        let mut response = Response::new(ResBody::from(error_msg));
+        *response.status_mut() = error_code;
+        let headers = response.headers_mut();
+        headers.insert(CONTENT_LENGTH, HeaderValue::from(error_msg.len()));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+        response
     }
 }
 
-impl Service<Request<Body>> for RouterSvc {
-    type Response = Response<Body>;
-    type Error = hyper::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+// Manual impl: `#[derive(Clone)]` would wrongly require `ReqBody: Clone + ResBody: Clone`.
+impl<ReqBody, ResBody> Clone for Router<ReqBody, ResBody> {
+    fn clone(&self) -> Self {
+        Self {
+            routes: Arc::clone(&self.routes),
+        }
+    }
+}
+
+impl<ReqBody, ResBody> fmt::Debug for Router<ReqBody, ResBody> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Router").finish_non_exhaustive()
+    }
+}
+
+impl<ReqBody, ResBody> tower_service::Service<Request<ReqBody>> for Router<ReqBody, ResBody>
+where
+    ResBody: From<&'static str>,
+{
+    type Response = Response<ResBody>;
+    type Error = Infallible;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
-    fn call(&mut self, request: Request<Body>) -> Self::Future {
-        let resp = match self.route(&request) {
-            Ok((handler, url_params)) => handler(url_params, request),
-            Err(status_code) => (self.error_handler)(status_code),
-        };
-        Box::pin(async { Ok(resp) })
+
+    fn call(&mut self, request: Request<ReqBody>) -> Self::Future {
+        ready(Ok(self.handle(request)))
     }
 }
 
-impl<T> Service<T> for Router {
-    type Response = RouterSvc;
-    type Error = std::io::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+impl<ReqBody, ResBody> hyper::service::Service<Request<ReqBody>> for Router<ReqBody, ResBody>
+where
+    ResBody: From<&'static str>,
+{
+    type Response = Response<ResBody>;
+    type Error = Infallible;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ok(()).into()
-    }
-
-    fn call(&mut self, _: T) -> Self::Future {
-        let routes = self.routes.clone();
-        let fut = async move { Ok(RouterSvc::new(routes)) };
-        Box::pin(fut)
+    fn call(&self, request: Request<ReqBody>) -> Self::Future {
+        ready(Ok(self.handle(request)))
     }
 }
